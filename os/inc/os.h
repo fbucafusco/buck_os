@@ -20,17 +20,17 @@
 
 typedef struct
 {
-	uint32_t * sp;								/* stack pointer saved during context switching */
+    uint32_t * sp;								/* stack pointer saved during context switching */
 } tTCB_Dyn;
 
 
 typedef struct
 {
-	void 	( *entry_point )( void );			/* pointer to the function associated with the task */
-	void      *arg;								/* pointer to the argument for the ask  			*/
-	uint32_t * stackframe;						/* pointer to the array that stores the stack for the task */
-	uint32_t   stacksize;						/* size of the stack array */
-	tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
+    void 	( *entry_point )( void );			/* pointer to the function associated with the task */
+    void      *arg;								/* pointer to the argument for the ask  			*/
+    uint32_t * stackframe;						/* pointer to the array that stores the stack for the task */
+    uint32_t   stacksize;						/* size of the stack array */
+    tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
 } tTCB;
 
 
