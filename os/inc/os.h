@@ -11,12 +11,20 @@
 #include "os_config.h"
 #include "board.h"
 
-#define MAX_STACK_SIZE 		512
+#define MAX_STACK_SIZE 				512
+#define MIN_STACK_SIZE 				68
 
+#define INVALID_TASK				-1
 
-#define INVALID_TASK		-1
+#define TASK_COUNT_TYPE				unsigned short
 
-#define TASK_COUNT_TYPE		unsigned short
+#ifndef OS_IDLE_HOOK_STACK_SIZE
+#define OS_IDLE_HOOK_STACK_SIZE 	MIN_STACK_SIZE
+#endif
+
+#define OS_IDLE_HOOK_PRIORITY 		0xFF
+
+extern void idle_hook();
 
 typedef enum
 {
@@ -33,8 +41,8 @@ typedef struct
     unsigned char priority;						/* task priority */
 #endif
 
-    tTaskState state;	     					/* task state */
-
+    tTaskState 	state;	     					/* task state */
+    uint32_t	delay;							/* counter for delay ticks */
 } tTCB_Dyn;
 
 
@@ -72,14 +80,24 @@ typedef struct
 																};
 
 /* declares a task which its function name is not reused by any other. */
-#define DECLARE_TASK( FCNNAME , ARG , STACKSIZE, PRI) 			DECLARE_TASK_R( FCNNAME , FCNNAME , ARG , STACKSIZE, PRI)
+#define DECLARE_TASK( FCNNAME , ARG , STACKSIZE, PRI, CONFIG) 			DECLARE_TASK_R( FCNNAME , FCNNAME , ARG , STACKSIZE, PRI, CONFIG)
 
-#define OS_TASKS_START() 	const tTCB *os_tcbs[] = {
+#define OS_TASKS_START() 	DECLARE_TASK(  idle_hook , NULL , OS_IDLE_HOOK_STACK_SIZE , OS_IDLE_HOOK_PRIORITY  , TASK_NOCONFIG); \
+							const tTCB *os_tcbs[] = {
 
 #define OS_ADD_TASK(TASK)							&TASK##_TCB,
 
-#define OS_TASKS_END()	 							}; \
-							TASK_COUNT_TYPE TASK_COUNT = sizeof(os_tcbs)/sizeof(tTCB *);
+#define OS_TASKS_END()	 							&idle_hook_TCB, \
+													}; 				\
+							TASK_COUNT_TYPE TASK_COUNT = sizeof(os_tcbs)/sizeof(tTCB *) - 1 ; //the -1 is because the idle hook is the last in this array
+
+#define OS_IDLE_TASK_INDEX	TASK_COUNT
+#define TASK_COUNT_WIH		(TASK_COUNT+1)	//WITH IDLE HOOK
+
+/* otras macros */
+#define OS_DISABLE_ISR()	__asm volatile("cpsid f\n");
+#define OS_ENABLE_ISR()		__asm volatile("cpsie f\n");
+
 
 
 /* flags for task confoguration */
