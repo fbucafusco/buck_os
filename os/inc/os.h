@@ -9,6 +9,7 @@
 #define SCHED_H_
 
 #include "os_config.h"
+#include "os_config_internal.h"
 #include "board.h"
 
 #define MAX_STACK_SIZE 				512
@@ -25,6 +26,11 @@
 #define OS_IDLE_HOOK_PRIORITY 		0xFF
 
 extern void idle_hook();
+
+/*tTaskSchedulePolicy*/
+
+#define osSchPolicyROUND_ROBIN			0
+#define osSchPolicyPRIORITY				1
 
 typedef enum
 {
@@ -54,7 +60,7 @@ typedef struct
     uint32_t   stacksize;						/* size of the stack array */
     tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
     uint32_t  config;							/* task configuration */
-    unsigned char priority;					     	/* task priority (ficed) or initial priority (dinamic) */
+    uint32_t  priority;					     	/* task priority (ficed) or initial priority (dinamic) */
 } tTCB;
 
 

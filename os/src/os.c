@@ -34,35 +34,59 @@ __attribute__( ( weak ) ) void return_hook()
     };
 }
 
+
+#if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
 /* politica de scheduling:
  * en cada tick se hace cambio de contexto a la tarea siguiente.
  * es un roundrobin de 1 ms.
- *
- *
- * Esta funcion SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
- * No debe modificar el estado de ninguna tarea.
  * */
 
+/* busca en los TCBs desde el indice "from" hasta "to" (no inclusive) */
+uint32_t osRR_SearchReadyTask(uint32_t from, uint32_t to)
+{
+	char i;
+
+	for( i = from ; i < to ; i++ )
+    {
+        if( os_tcbs[i]->pDin->state == osTskREADY )
+        {
+        	return i ;
+        }
+    }
+
+	return INVALID_TASK;
+}
+
+
+
+#endif
+
+#if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
+/* politica de scheduling:
+ * en cada tick se hace cambio de contexto a la tarea siguiente.
+ * es un roundrobin de 1 ms.
+ * */
+
+
+#endif
+
+
+/* os_schedule() SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
+* No debe modificar el estado de ninguna tarea.
+* */
 void os_schedule()
 {
-    uint32_t i;
-    uint32_t found = 0 ;
+    uint32_t next;
 
     OS_DISABLE_ISR();
 
     if( Sched.current_task == INVALID_TASK || Sched.current_task == OS_IDLE_TASK_INDEX )
     {
+#if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
         /* busco la primera tarea en ready */
-        for( i=0 ; i<TASK_COUNT ; i++ )
-        {
-            if( os_tcbs[i]->pDin->state == osTskREADY )
-            {
-                found = 1;
-                break;
-            }
-        }
-
-        if( found == 0 )
+        next = osRR_SearchReadyTask( 0 , TASK_COUNT );
+#endif
+        if( next == INVALID_TASK )
         {
             //no hay ninguna ready
 
@@ -72,35 +96,24 @@ void os_schedule()
         else
         {
             // Ok! encontre una ready
-            Sched.next_task = i;
+            Sched.next_task = next;
         }
     }
     else
     {
-        /* busco la siguiente tarea en ready */
-        for( i = Sched.current_task + 1 ; i < TASK_COUNT ; i++ )
-        {
-            if( os_tcbs[i]->pDin->state == osTskREADY )
-            {
-                found = 1;
-                break;
-            }
-        }
 
-        if( i == TASK_COUNT )
+#if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
+        /* busco la siguiente tarea en ready */
+    	 next = osRR_SearchReadyTask(  Sched.current_task + 1 , TASK_COUNT );
+
+        if( next == INVALID_TASK )
         {
             //no encontro
-            for( i = 0 ; i < Sched.current_task ; i++ )
-            {
-                if( os_tcbs[i]->pDin->state == osTskREADY )
-                {
-                    found = 1;
-                    break;
-                }
-            }
+            next = osRR_SearchReadyTask( 0 , Sched.current_task );
         }
+#endif
 
-        if( i == Sched.current_task )
+        if( next == INVALID_TASK )
         {
             /* evaluo que paso con current task
                puede estar en running, por lo que la dejo asi.
@@ -112,17 +125,10 @@ void os_schedule()
                 Sched.next_task = OS_IDLE_TASK_INDEX;
             }
         }
-
-        if( found == 0 )
-        {
-            /* entre todas las tareas, que no son la que venia corriendo, no se encontro otra ready.
-             * asique no se toca nada.
-             * Sched.next_task quedaria en invalid */
-        }
         else
         {
             //ok! encontre una ready
-            Sched.next_task = i;
+            Sched.next_task = next;
         }
     }
 
