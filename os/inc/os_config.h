@@ -27,7 +27,7 @@
  * If the user do not need to redefine the idle_hook, delete this definition.
  * If the user will redefine the idle_hook, it will need to scale it properly.
  * */
-#define OS_IDLE_HOOK_STACK_SIZE		100
+#define OS_IDLE_HOOK_STACK_SIZE		256
 
 
 #endif /* OS_CONFIG_H_ */

@@ -36,14 +36,21 @@ __attribute__( ( weak ) ) void return_hook()
 
 /* politica de scheduling:
  * en cada tick se hace cambio de contexto a la tarea siguiente.
- * es un roundrobin de 1 ms. */
+ * es un roundrobin de 1 ms.
+ *
+ *
+ * Esta funcion SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
+ * No debe modificar el estado de ninguna tarea.
+ * */
 
 void os_schedule()
 {
     uint32_t i;
     uint32_t found = 0 ;
 
-    if( Sched.current_task == INVALID_TASK )
+    OS_DISABLE_ISR();
+
+    if( Sched.current_task == INVALID_TASK || Sched.current_task == OS_IDLE_TASK_INDEX )
     {
         /* busco la primera tarea en ready */
         for( i=0 ; i<TASK_COUNT ; i++ )
@@ -93,6 +100,19 @@ void os_schedule()
             }
         }
 
+        if( i == Sched.current_task )
+        {
+            /* evaluo que paso con current task
+               puede estar en running, por lo que la dejo asi.
+               puede estar bloqueada: En este caso, la proxima tarea va a ser idle, porque la bloqueada y las otras
+               no estan ready.  */
+
+            if( os_tcbs[Sched.current_task]->pDin->state==osTskBLOCKED )
+            {
+                Sched.next_task = OS_IDLE_TASK_INDEX;
+            }
+        }
+
         if( found == 0 )
         {
             /* entre todas las tareas, que no son la que venia corriendo, no se encontro otra ready.
@@ -106,15 +126,22 @@ void os_schedule()
         }
     }
 
-    if( Sched.next_task != Sched.current_task && Sched.next_task != INVALID_TASK )
+    uint32_t condicion_cc = ( Sched.next_task != Sched.current_task && Sched.next_task != INVALID_TASK );
+
+    OS_ENABLE_ISR();
+
+    if( condicion_cc )
     {
         os_trigger_cc();
     }
 }
 
+uint32_t dummy_pend = 0;
+
 void os_trigger_cc()
 {
     OS_DISABLE_ISR();
+    dummy_pend=1;
     SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
     __ISB(); //INSTRUCTION SYNCHRONIZATION BARRIER
     __DSB(); //DATA SYNCHRONIZATION BARRIER
@@ -127,19 +154,22 @@ uint32_t *os_get_next_context( uint32_t *actualcontext )
 {
     uint32_t *rv;
 
+    dummy_pend=0;
+
     //primero veo si vengo del stackframe principal.
 
-    if( Sched.current_task != INVALID_TASK )
+    if( Sched.current_task == INVALID_TASK )
     {
+        //caso en que se quiere cambiar contexto desde el stackframe principal
+        //la primera ejecucion o viniendo de idle hook
         if( Sched.next_task != INVALID_TASK )
         {
-            os_tcbs[Sched.current_task]->pDin->state = osTskREADY;	/* change the state of the current task to ready */
-            os_tcbs[Sched.current_task]->pDin->sp = actualcontext;
-
             Sched.current_task = Sched.next_task;
+
             Sched.next_task    = INVALID_TASK;
 
             os_tcbs[Sched.current_task]->pDin->state = osTskRUNNING;/* change the state of the NEW current task to running */
+
             rv = os_tcbs[Sched.current_task]->pDin->sp;
 
             return rv;
@@ -147,16 +177,19 @@ uint32_t *os_get_next_context( uint32_t *actualcontext )
     }
     else
     {
-        //caso en que se quiere cambiar contexto desde el stackframe principal
-        //la primera ejecucion.
         if( Sched.next_task != INVALID_TASK )
         {
-            Sched.current_task = Sched.next_task;
+            if( os_tcbs[Sched.current_task]->pDin->state==osTskRUNNING )
+            {
+                os_tcbs[Sched.current_task]->pDin->state = osTskREADY;	/* change the state of the current task to ready */
+            }
 
+            os_tcbs[Sched.current_task]->pDin->sp = actualcontext;
+
+            Sched.current_task = Sched.next_task;
             Sched.next_task    = INVALID_TASK;
 
             os_tcbs[Sched.current_task]->pDin->state = osTskRUNNING;/* change the state of the NEW current task to running */
-
             rv = os_tcbs[Sched.current_task]->pDin->sp;
 
             return rv;
@@ -171,6 +204,8 @@ void osDelay( uint32_t delay_ms )
 {
     uint32_t ticks = delay_ms; //TODO: AGREGAR FACTOR DE ESCALA.
 
+    OS_DISABLE_ISR();
+
     if( delay_ms!= 0 && os_tcbs[Sched.current_task]->pDin->delay== 0 ) //TODO: ESTA ULTIMA VALIDACION ES SOLO PARA ZAFAR. NO DEBERIA IR.
     {
         /* load the delay in the register  */
@@ -180,32 +215,47 @@ void osDelay( uint32_t delay_ms )
         os_tcbs[Sched.current_task]->pDin->state  = osTskBLOCKED;
 
         /* the current task should be mark as invalid*/
-        Sched.current_task = INVALID_TASK;
+        //Sched.current_task = INVALID_TASK;
 
         /* call the scheduler */
         os_schedule();
     }
+
+    OS_ENABLE_ISR();
 }
+
+uint32_t check_timeouts_counter = 0;
 
 /* in a tick, it checkes the delays */
 void os_check_timeouts()
 {
     uint32_t i;
 
+    OS_DISABLE_ISR();
+
+    check_timeouts_counter++;
+
     for( i=0 ; i<TASK_COUNT ; i++ )
     {
-        if( os_tcbs[i]->pDin->state == osTskBLOCKED && os_tcbs[i]->pDin->delay != 0 )
+        if( os_tcbs[i]->pDin->state == osTskBLOCKED && os_tcbs[i]->pDin->delay > 0 )
         {
             os_tcbs[i]->pDin->delay--;
 
             /* if the task delay counter went to 0 */
-            if( os_tcbs[i]->pDin->delay == 0 )
+            if( os_tcbs[i]->pDin->delay > 0  )
             {
-                /* the task goes to blocking state */
+
+            }
+            else
+            {
+                /* the task goes to ready state */
                 os_tcbs[i]->pDin->state  = osTskREADY;
+                os_tcbs[i]->pDin->delay  = 0; //redundante
             }
         }
     }
+
+    OS_ENABLE_ISR();
 }
 
 void osStart()
@@ -242,7 +292,7 @@ void osStart()
         os_tcbs[i]->pDin->delay = 0;
 
         /* inicializo el stack en cero */
-        bzero( os_tcbs[i]->stackframe, os_tcbs[i]->stacksize );
+        bzero( os_tcbs[i]->stackframe , os_tcbs[i]->stacksize );
 
         /* cargo en variables locales para lectura mas amena */
         stackframe_ = os_tcbs[i]->stackframe;

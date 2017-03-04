@@ -54,7 +54,7 @@ typedef struct
     uint32_t   stacksize;						/* size of the stack array */
     tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
     uint32_t  config;							/* task configuration */
-    unsigned char priority;						/* task priority (ficed) or initial priority (dinamic) */
+    unsigned char priority;					     	/* task priority (ficed) or initial priority (dinamic) */
 } tTCB;
 
 
@@ -66,15 +66,15 @@ typedef struct
 
 
 /* this declares a task that uses the same function name */
-#define DECLARE_TASK_R( NOMBRE, FCNNAME , ARG , STACKSIZE, PRI, CONFIG)	uint8_t  	NOMBRE##_stack[STACKSIZE];		    \
-																tTCB_Dyn 	NOMBRE##_Din;		         	    \
-																const tTCB 	NOMBRE##_TCB =				 	    \
+#define DECLARE_TASK_R( NOMBRE, FCNNAME , ARG , STACKSIZE, PRI, CONFIG)	uint32_t	NOMBRE##_stack[(STACKSIZE)/4];	\
+																tTCB_Dyn 			NOMBRE##_Din;		            \
+																const tTCB 			NOMBRE##_TCB =				    \
 																{									 			\
 																	.entry_point = &FCNNAME,		   		    \
+																	.arg		 = ARG,							\
 																	.stackframe  = &NOMBRE##_stack,				\
 																	.stacksize   = sizeof(NOMBRE##_stack),		\
 																	.pDin        = &NOMBRE##_Din, 				\
-																	.arg		 = ARG,							\
 																	.priority    = PRI, 						\
 																	.config      = CONFIG,						\
 																};
@@ -106,6 +106,7 @@ typedef struct
 
 /* os methods declaration */
 void osStart();
+void osDelay( uint32_t delay_ms );
 
 #endif /* SCHED_H_ */
 
