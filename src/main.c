@@ -14,18 +14,18 @@ tLedBlick leds[] =
     [0] =
     {
         .led_number  = 3 ,
-        .delay = 100,
+        .delay = 500,
     },
 
     [1] =
     {
         .led_number = 4 ,
-        .delay = 200,
+        .delay = 1000,
     },
     [2] =
     {
         .led_number = 5 ,
-        .delay = 300,
+        .delay = 2000,
     },
 };
 

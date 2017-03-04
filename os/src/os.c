@@ -42,19 +42,19 @@ __attribute__( ( weak ) ) void return_hook()
  * */
 
 /* busca en los TCBs desde el indice "from" hasta "to" (no inclusive) */
-uint32_t osRR_SearchReadyTask(uint32_t from, uint32_t to)
+uint32_t osRR_SearchReadyTask( uint32_t from, uint32_t to )
 {
-	char i;
+    char i;
 
-	for( i = from ; i < to ; i++ )
+    for( i = from ; i < to ; i++ )
     {
         if( os_tcbs[i]->pDin->state == osTskREADY )
         {
-        	return i ;
+            return i ;
         }
     }
 
-	return INVALID_TASK;
+    return INVALID_TASK;
 }
 
 
@@ -104,7 +104,7 @@ void os_schedule()
 
 #if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
         /* busco la siguiente tarea en ready */
-    	 next = osRR_SearchReadyTask(  Sched.current_task + 1 , TASK_COUNT );
+        next = osRR_SearchReadyTask(  Sched.current_task + 1 , TASK_COUNT );
 
         if( next == INVALID_TASK )
         {
@@ -205,6 +205,33 @@ uint32_t *os_get_next_context( uint32_t *actualcontext )
     return actualcontext;
 }
 
+#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
+/* devuelve el minimo remain de los delays de las tareas. */
+uint32_t os_get_min_remain()
+{
+    uint32_t i;
+    uint32_t min_remain = 0xFFFFFFFF;
+
+    for( i=0 ; i<TASK_COUNT ; i++ )
+    {
+        if( os_tcbs[i]->pDin->state == osTskBLOCKED && os_tcbs[i]->pDin->delay > 0 )
+        {
+            if( os_tcbs[i]->pDin->delay < min_remain )
+            {
+                min_remain = os_tcbs[i]->pDin->delay;
+            }
+        }
+    }
+
+    if( Sched.main_delay_counter < min_remain && Sched.main_delay_counter!= 0 )
+    {
+        min_remain = Sched.main_delay_counter;
+    }
+
+    return min_remain;
+}
+#endif
+
 /* implements a blocking delay for the current running task */
 void osDelay( uint32_t delay_ms )
 {
@@ -212,25 +239,78 @@ void osDelay( uint32_t delay_ms )
 
     OS_DISABLE_ISR();
 
-    if( delay_ms!= 0 && os_tcbs[Sched.current_task]->pDin->delay== 0 ) //TODO: ESTA ULTIMA VALIDACION ES SOLO PARA ZAFAR. NO DEBERIA IR.
+    if( delay_ms!= 0 )
     {
-        /* load the delay in the register  */
-        os_tcbs[Sched.current_task]->pDin->delay = delay_ms;
-
         /* the task goes to blocking state */
         os_tcbs[Sched.current_task]->pDin->state  = osTskBLOCKED;
 
-        /* the current task should be mark as invalid*/
-        //Sched.current_task = INVALID_TASK;
+#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
+        uint32_t min_remain;
+        uint32_t i;
+
+        if( delay_ms >= Sched.main_delay_counter )
+        {
+            /* load the delay in the register  */
+            os_tcbs[Sched.current_task]->pDin->delay = delay_ms;
+
+            min_remain = os_get_min_remain();	//va a haber un minimo porque arriba ya se actualizo
+
+            os_tcbs[Sched.current_task]->pDin->delay  -= min_remain;
+
+            /*      for( i=0 ; i<TASK_COUNT ; i++ )
+                  {
+                   //resto a todas los remains, el valor del minimo
+                      if( os_tcbs[i]->pDin->state == osTskBLOCKED   )
+                      {
+                          if( os_tcbs[i]->pDin->delay > 0 )
+                          {
+                              os_tcbs[i]->pDin->delay -= min_remain ;
+                          }
+                      }
+                  }*/
+
+            Sched.main_delay_counter = min_remain;
+        }
+        else
+        {
+            uint32_t dif = Sched.main_delay_counter - delay_ms;
+
+
+            /* load the delay in the register  */
+            os_tcbs[Sched.current_task]->pDin->delay = 0;
+
+            /* a todos los otros remains, calculados con el tiempo parcial anterior se van a incrementar
+             * en la dif */
+            for( i=0 ; i<TASK_COUNT ; i++ )
+            {
+                if( os_tcbs[i]->pDin->state == osTskBLOCKED  )
+                {
+                    if( i != Sched.current_task )
+                    {
+                        os_tcbs[i]->pDin->delay += dif;
+                    }
+
+                }
+            }
+
+            Sched.main_delay_counter = delay_ms;
+        }
+
+
+
+#else
+        /* load the delay in the register  */
+        os_tcbs[Sched.current_task]->pDin->delay = delay_ms;
+
+#endif
 
         /* call the scheduler */
         os_schedule();
     }
-
     OS_ENABLE_ISR();
 }
 
-uint32_t check_timeouts_counter = 0;
+
 
 /* in a tick, it checkes the delays */
 void os_check_timeouts()
@@ -239,7 +319,56 @@ void os_check_timeouts()
 
     OS_DISABLE_ISR();
 
-    check_timeouts_counter++;
+#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
+    uint32_t min_remain = 0xFFFFFFFF;
+
+    /* en este caso, el campo delay de los tcbs, identificará el reminder posterior al timeout principal */
+
+    if( Sched.main_delay_counter > 0 )
+    {
+        /* we reduce the counter */
+        Sched.main_delay_counter--;
+
+        if( Sched.main_delay_counter==0 )
+        {
+            //timeout: de uno o varios delays
+
+            for( i=0 ; i<TASK_COUNT ; i++ )
+            {
+                if( os_tcbs[i]->pDin->state == osTskBLOCKED  )
+                {
+                    if( os_tcbs[i]->pDin->delay == 0 )
+                    {
+                        //si el reminder es cero, entonces dio timeout esta tarea, y debe volver a ready.
+                        os_tcbs[i]->pDin->state  = osTskREADY;
+                    }
+                    else
+                    {
+                        //busco el minimo de los remainders (os_tcbs[i]->pDin->delay)
+                        if( os_tcbs[i]->pDin->delay < min_remain )
+                        {
+                            min_remain = os_tcbs[i]->pDin->delay;
+                        }
+                    }
+                }
+            }
+
+            /* para todas las tareas de remain mayor a cero, recalculo el remain. */
+            for( i=0 ; i<TASK_COUNT ; i++ )
+            {
+                if( os_tcbs[i]->pDin->state == osTskBLOCKED && os_tcbs[i]->pDin->delay > 0 )
+                {
+                    os_tcbs[i]->pDin->delay -= min_remain ;
+                }
+            }
+
+            Sched.main_delay_counter = min_remain;
+        }
+
+    }
+#else
+
+
 
     for( i=0 ; i<TASK_COUNT ; i++ )
     {
@@ -260,7 +389,7 @@ void os_check_timeouts()
             }
         }
     }
-
+#endif
     OS_ENABLE_ISR();
 }
 
@@ -274,8 +403,12 @@ void osStart()
     NVIC_SetPriority( PendSV_IRQn, ( 1 << __NVIC_PRIO_BITS ) - 1 );
 
     /**/
-    Sched.current_task = INVALID_TASK;
-    Sched.next_task    = INVALID_TASK;
+    Sched.current_task 			= INVALID_TASK;
+    Sched.next_task    			= INVALID_TASK;
+
+#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
+    Sched.main_delay_counter 	= 0;
+#endif
 
     TASK_COUNT_TYPE i;
     uint32_t * stackframe_;

@@ -68,6 +68,10 @@ typedef struct
 {
     int32_t current_task; /* current_running_task */
     int32_t next_task; 	  /* next task to be run when there is a context change. */
+
+#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
+    int32_t main_delay_counter;
+#endif
 } tSched;
 
 
