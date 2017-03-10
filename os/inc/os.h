@@ -17,20 +17,37 @@
 
 #define INVALID_TASK				-1
 
-#define TASK_COUNT_TYPE				unsigned short
+#define TASK_COUNT_TYPE				uint32_t	//TODO: PROPAGAR ESTA DEFINICION POR TODOS LADOS...
+#define OS_PRIORITY_TYPE			unsigned char
 
 #ifndef OS_IDLE_HOOK_STACK_SIZE
 #define OS_IDLE_HOOK_STACK_SIZE 	MIN_STACK_SIZE
 #endif
 
-#define OS_IDLE_HOOK_PRIORITY 		0xFF
+/* priority is higher when the value of the priority is the higher */
+enum
+{
+    OS_PRI_LOWEST,
+    OS_PRI_LOW,
+    OS_PRI_MID,
+    OS_PRI_HIGH,
+    OS_PRI_HIGHEST,
+    OS_PRI_COUNT
+};
+
+
+#define OS_IDLE_HOOK_PRIORITY 		0x55
+
+
 
 extern void idle_hook();
 
 /*tTaskSchedulePolicy*/
-
 #define osSchPolicyROUND_ROBIN			0
 #define osSchPolicyPRIORITY				1
+
+/* objetos del idle hook */
+uint32_t * idle_hook_sp;
 
 typedef enum
 {
@@ -43,8 +60,9 @@ typedef enum
 typedef struct
 {
     uint32_t * sp;								/* stack pointer saved during context switching */
+
 #if OS_FIXED_PIORITY == 0
-    unsigned char priority;						/* task priority */
+    OS_PRIORITY_TYPE priority;						/* task priority */
 #endif
 
     tTaskState 	state;	     					/* task state */
@@ -54,13 +72,13 @@ typedef struct
 
 typedef struct
 {
-    void 	( *entry_point )( void );			/* pointer to the function associated with the task */
+    void 	( *entry_point )( void *arg ); /* pointer to the function associated with the task */
     void      *arg;								/* pointer to the argument for the ask  			*/
     uint32_t  *stackframe;						/* pointer to the array that stores the stack for the task */
     uint32_t   stacksize;						/* size of the stack array */
     tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
     uint32_t  config;							/* task configuration */
-    uint32_t  priority;					     	/* task priority (ficed) or initial priority (dinamic) */
+    OS_PRIORITY_TYPE	  priority;				/* task priority (ficed) or initial priority (dinamic) */
 } tTCB;
 
 
@@ -99,16 +117,45 @@ typedef struct
 
 #define OS_TASKS_END()	 							&idle_hook_TCB, \
 													}; 				\
-							TASK_COUNT_TYPE TASK_COUNT = sizeof(os_tcbs)/sizeof(tTCB *) - 1 ; //the -1 is because the idle hook is the last in this array
+							TASK_COUNT_TYPE TASK_COUNT = sizeof(os_tcbs)/sizeof(tTCB *) - 1 ;  /*the -1 is because the idle hook is the last in this array*/ \
+							OS_TASKS_END_WITH_PRIO();
+
+#if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
+#define OS_TASKS_END_WITH_PRIO()	unsigned char PRIORITIES_COUNT[OS_PRI_COUNT];						 /* THIS ARRAY IS FILLED IN RUN TIME WITH THE AMOUNT OF TASKS THAT HAS OF EACH PRIO */ \
+									TASK_COUNT_TYPE PRIO_TASKS[sizeof(os_tcbs)/sizeof(os_tcbs[0]) ];   /*  \
+									DECLARE_PRIORITY_QUEUE(prioq, sizeof(os_tcbs)/sizeof(tTCB *) - 1, INVALID_TASK);*/
+#else
+#define OS_TASKS_END_WITH_PRIO()	;
+#endif
+
+#if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
+/* For this policy, the current task tcb index is the one stored in the array PRIO_TASKS.
+ * Sched.current_task just stores the index of this vector.
+ *  is configured, the current task index is directly stored in Sched.current_task*/
+#define OS_CURRENT_TASK_TCB_INDEX		PRIO_TASKS[Sched.current_task]
+#define OS_NEXT_TASK_TCB_INDEX			PRIO_TASKS[Sched.next_task]
+#else
+/* if round robin is configured, the current task index is directly stored in Sched.current_task*/
+#define OS_CURRENT_TASK_TCB_INDEX		Sched.current_task
+#define OS_NEXT_TASK_TCB_INDEX			Sched.next_task
+//#define OS_CURRENT_TASK_TCB_INDEX_INVALID
+#endif
+
+
 
 #define OS_IDLE_TASK_INDEX	TASK_COUNT
 #define TASK_COUNT_WIH		(TASK_COUNT+1)	//WITH IDLE HOOK
 
 /* otras macros */
+#ifdef _WIN32
+#define OS_DISABLE_ISR()
+#define OS_ENABLE_ISR()
+
+#else
 #define OS_DISABLE_ISR()	__asm volatile("cpsid f\n");
 #define OS_ENABLE_ISR()		__asm volatile("cpsie f\n");
 
-
+#endif
 
 /* flags for task confoguration */
 #define TASK_NOCONFIG	0x0000000
@@ -117,6 +164,9 @@ typedef struct
 /* os methods declaration */
 void osStart();
 void osDelay( uint32_t delay_ms );
+
+
+void idle_hook();
 
 #endif /* SCHED_H_ */
 

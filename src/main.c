@@ -42,9 +42,6 @@ void idle_hook()
     }
 }
 
-
-
-
 void generic_task_con_delay( void* arg )
 {
     tLedBlick * led_config = ( tLedBlick * ) arg;
@@ -75,7 +72,7 @@ void generic_task( void* arg )
 }
 
 /* DECLARACION DE TAREA 1 */
-DECLARE_TASK_R( task1 , generic_task_con_delay , &leds[0] , MAX_STACK_SIZE , 1 , TASK_AUTOSTART )
+DECLARE_TASK_R( task1 , generic_task_con_delay , &leds[0] , MAX_STACK_SIZE , 0 , TASK_AUTOSTART )
 
 /* DECLARACION DE TAREA 2 */
 DECLARE_TASK_R( task2 , generic_task_con_delay , &leds[1] , MAX_STACK_SIZE , 1  , TASK_AUTOSTART )
@@ -93,6 +90,7 @@ OS_TASKS_END()
 /* FIN DE CONFIGURACION DE OS */
 int main( void )
 {
+
     osStart();
 }
 

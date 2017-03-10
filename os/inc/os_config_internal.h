@@ -23,6 +23,8 @@
  *    Tiene la ventaja de que el proceso de delays en el tick del sistema es mucho mas agil.
  * 0: El tick gestiona los delays directamente con el registro de delay de la tarea.
  * */
-#define OS_INTERNAL_DELAY_WITH_MAIN_COUNTER	1
+#define OS_INTERNAL_DELAY_WITH_MAIN_COUNTER		0
+
+
 
 #endif /* OS_CONFIG_INTERNAL_H_ */

@@ -14,9 +14,20 @@
 
 
 /*
- * ELEGIR UNA DE tTaskSchedulePolicy
+ * ELEGIR UNA DE POLITICA DE SCHEDULING DE tTaskSchedulePolicy
  */
-#define OS_SCHEDULE_POLICY			osSchPolicyROUND_ROBIN
+#define OS_SCHEDULE_POLICY			osSchPolicyPRIORITY //osSchPolicyROUND_ROBIN
+
+
+/*
+ * OS_SCHEDULE_PRIORITY_COOP
+ * 1: Tasks with the same priority MUST cooperate with rescheduling points
+ * 0: Tasks with the same priority are scheduled as RR.
+ */
+#define OS_SCHEDULE_PRIORITY_COOP		0
+
+
+//TODO: implementar time slicing.
 
 /*
  * OS_FIXED_PIORITY
