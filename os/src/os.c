@@ -6,20 +6,16 @@
  */
 
 #include "os.h"
+#include "os_delay.h"
 #include "chip.h"
 
 /* external objects thart are defined by the user */
 extern const tTCB *os_tcbs[];
 extern unsigned short TASK_COUNT;
-
-#if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
 extern TASK_COUNT_TYPE PRIORITIES_COUNT[OS_PRI_COUNT];
 extern TASK_COUNT_TYPE PRIO_TASKS[];
-#endif
-
 
 tSched Sched;
-
 
 /* idle_hook
  * es llaado cuando el OS no tiene que ejecutar ninguna tarea. */
@@ -30,6 +26,7 @@ __attribute__( ( weak ) ) void idle_hook()
 
     };
 }
+
 
 /* idle_hook
  * es llaado cuando el OS no tiene que ejecutar ninguna tarea. */
@@ -43,8 +40,10 @@ __attribute__( ( weak ) ) void return_hook()
 
 
 /* prdena las tareas por pioridades.
- * deja en PRIO_TASKS los indices de tcbs de las mas prioritarias a las menos. */
-void osPP_SortPrioArray()
+ * deja en PRIO_TASKS los indices de tcbs de las mas prioritarias a las menos.
+ *
+ * : TODO: si se implementara un "generator" estas tareas no seria necesarias y se podria dejar en un array const */
+void _os_pp_sort_prio_array()
 {
     TASK_COUNT_TYPE i, j ;
     TASK_COUNT_TYPE swap;
@@ -63,28 +62,6 @@ void osPP_SortPrioArray()
     }
 }
 
-/*
- *
- */
-//no se usa.
-void os_change_task_state( TASK_COUNT_TYPE index ,  tTaskState state )
-{
-#if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-    /* solo para el modo de scheduling, hay que */
-    if( state == osTskREADY )
-    {
-        //agregar a la cola de ready
-        //pq_Add( &prioq,  index, os_tcbs[index]->priority );
-    }
-    else
-    {
-        //quitar de la cola de ready
-        //pq_Remove( &prioq, index );
-    }
-#endif
-
-    os_tcbs[index]->pDin->state = state;
-}
 
 
 #if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
@@ -120,7 +97,7 @@ uint32_t osRRP_SearchReadyTask( uint32_t from, uint32_t to )
 
 
 /* no se usa */
-void osPP_RotateSubVector( TASK_COUNT_TYPE inicio, TASK_COUNT_TYPE fin )
+void _os_pp_rotate_subarray( TASK_COUNT_TYPE inicio, TASK_COUNT_TYPE fin )
 {
     TASK_COUNT_TYPE i;
     TASK_COUNT_TYPE back;
@@ -137,7 +114,7 @@ void osPP_RotateSubVector( TASK_COUNT_TYPE inicio, TASK_COUNT_TYPE fin )
 }
 
 /* busca, en PRIO_TASK la primera de mas prioridad en ready. */
-uint32_t osPP_SearchReadyTask_Coop()
+uint32_t _os_pp_search_ready_task_coop()
 {
     TASK_COUNT_TYPE i;
 
@@ -154,7 +131,7 @@ uint32_t osPP_SearchReadyTask_Coop()
 
 /* busca en los TCBs desde el indice 0 a TASK_COUNT (no inclusive)
  * las tareas ready mas prioritarias */
-uint32_t osPP_SearchReadyTask(  )
+uint32_t _os_pp_search_ready_task(  )
 {
     TASK_COUNT_TYPE i;
     TASK_COUNT_TYPE j;
@@ -164,7 +141,7 @@ uint32_t osPP_SearchReadyTask(  )
     OS_PRIORITY_TYPE pri;
 
 #if OS_SCHEDULE_PRIORITY_COOP==1
-
+#error REVISAR IMPLEMENTACION
     /* For cooperative scheduling, we have to get the task from maximum priority to minimum.
      * PRIO_TASKS has the index for the tasks, ordered by priority */
     for( i = 0 ; i < TASK_COUNT ; i++ )
@@ -183,6 +160,10 @@ uint32_t osPP_SearchReadyTask(  )
     /* busco next */
     j=0;
 
+    /*: TODO:  en la inicializacion de PRIORITIES_COUNT se podria dejar en ram una variable
+     *         q tenga la prioridad mas alta usada asi arrancar este for con una prioridad en la
+     *         que SI hay tareas y no barrerer prioridades sin tareas.
+     *         Otra opcion es normalizar las prioridades y listo.... pero creo que esto podria hacerse con un "generador" */
     for( pri = OS_PRI_HIGHEST ; pri != 0xFF ; pri -- )
     {
         if( PRIORITIES_COUNT[pri] )
@@ -221,18 +202,15 @@ uint32_t osPP_SearchReadyTask(  )
             while( i != i_0 );
 
             /* si sale del while, significa que no se encontro una tarea en ready en el segmento de PRIO_TASKS*/
-
         }
 
         j  +=  PRIORITIES_COUNT[pri] ;
     }
 
-
 #endif
 
     return INVALID_TASK;
 }
-
 
 
 #endif
@@ -241,7 +219,7 @@ uint32_t osPP_SearchReadyTask(  )
 /* os_schedule() SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
 * No debe modificar el estado de ninguna tarea.
 * */
-void os_schedule()
+void _os_schedule()
 {
     uint32_t next;
 
@@ -255,7 +233,7 @@ void os_schedule()
 #endif
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-        next = osPP_SearchReadyTask_Coop();
+        next = _os_pp_search_ready_task_coop();
 #endif
 
         if( next == INVALID_TASK )
@@ -289,7 +267,7 @@ void os_schedule()
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
         /* busco la primera tarea en ready con mayor prioridad */
-        next =  osPP_SearchReadyTask();
+        next =  _os_pp_search_ready_task();
 #endif
 
         if( next == INVALID_TASK )
@@ -317,16 +295,14 @@ void os_schedule()
 
     if( condicion_cc )
     {
-        os_trigger_cc();
+        _os_trigger_cc();
     }
 }
 
-uint32_t dummy_pend = 0;
 
-void os_trigger_cc()
+void _os_trigger_cc()
 {
     OS_DISABLE_ISR();
-    dummy_pend=1;
     SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
     __ISB(); //INSTRUCTION SYNCHRONIZATION BARRIER
     __DSB(); //DATA SYNCHRONIZATION BARRIER
@@ -335,11 +311,9 @@ void os_trigger_cc()
 
 
 /* funcion llamada por pendsv para obtener el nuevo contexto.*/
-uint32_t *os_get_next_context( uint32_t *actualcontext )
+uint32_t *_os_get_next_context( uint32_t *actualcontext )
 {
     uint32_t *rv;
-
-    dummy_pend=0;
 
     //primero veo si vengo del stackframe principal.
     if( Sched.current_task == INVALID_TASK )
@@ -388,7 +362,7 @@ uint32_t *os_get_next_context( uint32_t *actualcontext )
 /*
  * devuelve el minimo remain de los delays de las tareas.
  * */
-uint32_t os_get_min_remain()
+uint32_t _os_get_min_remain()
 {
     uint32_t i;
     uint32_t min_remain = 0xFFFFFFFF;
@@ -413,153 +387,38 @@ uint32_t os_get_min_remain()
 }
 #endif
 
-/* implements a blocking delay for the current running task */
-void osDelay( uint32_t delay_ms )
+
+void _os_tcb_init_stack( tTCB *pTcb )
 {
-    uint32_t ticks = delay_ms; //TODO: AGREGAR FACTOR DE ESCALA.
+    uint32_t * stackframe_;
+    uint32_t   stacksize_;
 
-    OS_DISABLE_ISR();
-
-    if( delay_ms!= 0 )
-    {
-        /* the task goes to blocking state */
-        os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->state  = osTskBLOCKED;
-
-#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
-        uint32_t min_remain;
-        uint32_t i;
-
-        if( delay_ms >= Sched.main_delay_counter )
-        {
-            /* load the delay in the register  */
-            os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay = delay_ms;
-
-            min_remain = os_get_min_remain();	//va a haber un minimo porque arriba ya se actualizo
-
-            os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay  -= min_remain;
-
-            Sched.main_delay_counter = min_remain;
-        }
-        else
-        {
-            uint32_t dif = Sched.main_delay_counter - delay_ms;
-
-
-            /* load the delay in the register  */
-            os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay = 0;
-
-            /* a todos los otros remains, calculados con el tiempo parcial anterior se van a incrementar
-             * en la dif */
-            for( i=0 ; i<TASK_COUNT ; i++ )
-            {
-                if( os_tcbs[i]->pDin->state == osTskBLOCKED  )
-                {
-                    if( i != OS_CURRENT_TASK_TCB_INDEX )
-                    {
-                        os_tcbs[i]->pDin->delay += dif;
-                    }
-
-                }
-            }
-
-            Sched.main_delay_counter = delay_ms;
-        }
+    /* inicializo el stack en cero */
+    bzero( pTcb->stackframe , pTcb->stacksize );
 
 
 
-#else
-        /* load the delay in the register  */
-        os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay = delay_ms;
-#endif
+    /* cargo en variables locales para lectura mas amena */
+    stackframe_ = pTcb->stackframe;
+    stacksize_  = pTcb->stacksize;
 
-        /* call the scheduler */
-        os_schedule();
-    }
-    OS_ENABLE_ISR();
-}
+    /* armo el frame inicial */
+    stackframe_[stacksize_/4-1] = 1<<24; 									/* xPSR.T = 1 */
+    stackframe_[stacksize_/4-2] = ( uint32_t ) pTcb->entry_point; 	/* PC */
+    stackframe_[stacksize_/4-3] = ( uint32_t ) return_hook; 			    /* LR */
 
+    stackframe_[stacksize_/4-8] = ( uint32_t ) pTcb->arg; 			/* R0 <- arg */
+    stackframe_[stacksize_/4-9] = 0xFFFFFFF9; 				    			/* como apila 1ro el LR */
 
+    /* guardo el stackpointer en tcb*/
+    pTcb->pDin->sp = stackframe_ + stacksize_/4 - 17; 		        /* sp inicial  el 17 es porque pusheo de r4 a r11 + lr   */
 
-/* in a tick, it checkes the delays */
-void os_check_timeouts()
-{
-    uint32_t i;
-
-    OS_DISABLE_ISR();
-
-#if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
-    uint32_t min_remain = 0xFFFFFFFF;
-
-    /* en este caso, el campo delay de los tcbs, identificará el reminder posterior al timeout principal */
-
-    if( Sched.main_delay_counter > 0 )
-    {
-        /* we reduce the counter */
-        Sched.main_delay_counter--;
-
-        if( Sched.main_delay_counter==0 )
-        {
-            //timeout: de uno o varios delays
-
-            for( i=0 ; i<TASK_COUNT ; i++ )
-            {
-                if( os_tcbs[i]->pDin->state == osTskBLOCKED  )
-                {
-                    if( os_tcbs[i]->pDin->delay == 0 )
-                    {
-                        //si el reminder es cero, entonces dio timeout esta tarea, y debe volver a ready.
-                        os_tcbs[i]->pDin->state  = osTskREADY;
-                    }
-                    else
-                    {
-                        //busco el minimo de los remainders (os_tcbs[i]->pDin->delay)
-                        if( os_tcbs[i]->pDin->delay < min_remain )
-                        {
-                            min_remain = os_tcbs[i]->pDin->delay;
-                        }
-                    }
-                }
-            }
-
-            /* para todas las tareas de remain mayor a cero, recalculo el remain. */
-            for( i=0 ; i<TASK_COUNT ; i++ )
-            {
-                if( os_tcbs[i]->pDin->state == osTskBLOCKED && os_tcbs[i]->pDin->delay > 0 )
-                {
-                    os_tcbs[i]->pDin->delay -= min_remain ;
-                }
-            }
-
-            Sched.main_delay_counter = min_remain;
-        }
-
-    }
-#else
-    for( i=0 ; i<TASK_COUNT ; i++ )
-    {
-        if( os_tcbs[i]->pDin->state == osTskBLOCKED && os_tcbs[i]->pDin->delay > 0 )
-        {
-            os_tcbs[i]->pDin->delay--;
-
-            /* if the task delay counter went to 0 */
-            if( os_tcbs[i]->pDin->delay > 0  )
-            {
-
-            }
-            else
-            {
-                /* the task goes to ready state */
-                os_tcbs[i]->pDin->state  = osTskREADY;
-                os_tcbs[i]->pDin->delay  = 0; //redundante
-            }
-        }
-    }
-#endif
-    OS_ENABLE_ISR();
 }
 
 void osStart()
 {
+    TASK_COUNT_TYPE i;
+
     Board_Init();
 
     SystemCoreClockUpdate();
@@ -580,10 +439,6 @@ void osStart()
     memset( PRIORITIES_COUNT , 0, sizeof( PRIORITIES_COUNT ) );
 #endif
 
-    TASK_COUNT_TYPE i;
-    uint32_t * stackframe_;
-    uint32_t   stacksize_;
-
     /* for each task, initialize the stack */
     for( i=0 ; i<TASK_COUNT_WIH ; i++ )
     {
@@ -591,37 +446,21 @@ void osStart()
         if( os_tcbs[i]->config & TASK_AUTOSTART )
         {
             os_tcbs[i]->pDin->state = osTskREADY;
-
-#if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-            /* busco la primera tarea en ready con mayor prioridad */
-            //   pq_Add( &prioq, i,os_tcbs[i]->priority );
-#endif
         }
         else
         {
             os_tcbs[i]->pDin->state = osTskNOT_ACTIVE;
         }
 
+        /* events init */
+        os_tcbs[i]->pDin->events_waiting = 0;					/* events_waiting:  */
+        os_tcbs[i]->pDin->events_setted	= 0;					/* events_setted:  */
+
         /* the delay is zero */
         os_tcbs[i]->pDin->delay = 0;
 
-        /* inicializo el stack en cero */
-        bzero( os_tcbs[i]->stackframe , os_tcbs[i]->stacksize );
-
-        /* cargo en variables locales para lectura mas amena */
-        stackframe_ = os_tcbs[i]->stackframe;
-        stacksize_  = os_tcbs[i]->stacksize;
-
-        /* armo el frame inicial */
-        stackframe_[stacksize_/4-1] = 1<<24; 									/* xPSR.T = 1 */
-        stackframe_[stacksize_/4-2] = ( uint32_t ) os_tcbs[i]->entry_point; 	/* PC */
-        stackframe_[stacksize_/4-3] = ( uint32_t ) return_hook; 			    /* LR */
-
-        stackframe_[stacksize_/4-8] = ( uint32_t ) os_tcbs[i]->arg; 			/* R0 <- arg */
-        stackframe_[stacksize_/4-9] = 0xFFFFFFF9; 				    			/* como apila 1ro el LR */
-
-        /* guardo el stackpointer en tcb*/
-        os_tcbs[i]->pDin->sp = stackframe_ + stacksize_/4 - 17; 		        /* sp inicial  el 17 es porque pusheo de r4 a r11 + lr   */
+        /* inicializo el stack */
+        _os_tcb_init_stack( os_tcbs[i] );
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
 
@@ -633,34 +472,25 @@ void osStart()
         os_tcbs[i]->pDin->priority = os_tcbs[i]->priority;
 #endif
 
-
-        /*  if( i!=OS_IDLE_TASK_INDEX )
-          {*/
-        /* inicialmente las tareas estan desordenadas */
+        /* inicialmente las tareas estan desordenadas : TODO: si se implementara un "generator" estas tareas no seria necesarias y se podria dejar en un array const */
         PRIO_TASKS[i] = i ;
         PRIORITIES_COUNT[os_tcbs[i]->priority]++;
-        /* }*/
 #endif
     }
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-    /* se ordena el array de prioridades */
-    osPP_SortPrioArray();
+    /* se ordena el array de prioridades. */
+    _os_pp_sort_prio_array();
 #endif
 
-    /*inicio el tick*/
+    /* inicio el tick */
     SysTick_Config( SystemCoreClock/1000 );
-
-    while ( 1 )
-    {
-
-    }
 }
 
 /* handler de systick
  * aqui se decide por la tarea siguiente. */
 void SysTick_Handler()
 {
-    os_check_timeouts();
-    os_schedule();
+    _os_delay_update();
+    _os_schedule();
 }

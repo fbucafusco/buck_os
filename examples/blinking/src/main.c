@@ -46,10 +46,21 @@ void generic_task_con_delay( void* arg )
 {
     tLedBlick * led_config = ( tLedBlick * ) arg;
     int j;
-
+    int a;
+    char temp[20] = "task X";
 
     while( 1 )
     {
+        /*
+        a = ( ( uint32_t ) led_config - 	( uint32_t )&leds[0] ) / sizeof( tLedBlick );
+        a +=  '0';
+
+
+        OS_DISABLE_ISR()
+        temp[5]=a;
+        DEBUGSTR( temp );
+        OS_ENABLE_ISR()
+        */
         Board_LED_Toggle( led_config->led_number );
         osDelay( led_config->delay );
     }
@@ -67,6 +78,7 @@ void generic_task( void* arg )
         Board_LED_Toggle( led_config->led_number );
         for ( j=0 ; j<led_config->delay ; j++ )
         {
+
         }
     }
 }
@@ -81,11 +93,11 @@ DECLARE_TASK_R( task2 , generic_task_con_delay , &leds[1] , MAX_STACK_SIZE , 1  
 DECLARE_TASK_R( task3 , generic_task_con_delay , &leds[2] , MAX_STACK_SIZE , 1  , TASK_AUTOSTART ) //
 
 /* INICIO DE CONFIGURACION DE OS */
-OS_TASKS_START()
+DECLARE_OS_START()
 OS_ADD_TASK( task1 )
 OS_ADD_TASK( task2 )
 OS_ADD_TASK( task3 )
-OS_TASKS_END()
+DECLARE_OS_END()
 
 /* FIN DE CONFIGURACION DE OS */
 int main( void )

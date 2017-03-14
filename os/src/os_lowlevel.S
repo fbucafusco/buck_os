@@ -12,7 +12,7 @@ PendSV_Handler:
 
 	mrs r0, msp
 
-	bl os_get_next_context
+	bl _os_get_next_context
 
 	msr msp, r0   /* sp <= r0 */
 
