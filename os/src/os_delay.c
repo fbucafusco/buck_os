@@ -94,9 +94,9 @@ void _os_delay_update()
 
 
 /* implements a blocking delay for the current running task */
-void osDelay( uint32_t delay_ms )
+void osDelay( OS_DELAY_TYPE delay_ms )
 {
-    uint32_t ticks = delay_ms; //TODO: AGREGAR FACTOR DE ESCALA.
+    OS_DELAY_TYPE ticks = delay_ms; //TODO: AGREGAR FACTOR DE ESCALA.
 
     if( delay_ms!= 0 )
     {

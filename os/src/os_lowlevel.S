@@ -6,17 +6,25 @@
 	.thumb_func
 
 PendSV_Handler:
- 	cpsid f	/* disable isr*/
+ 	cpsid f	/* disable isr */
 
-	push {r4-r11,lr}
+	tst lr, #0x00000010 /* testeo el bit EXC_RETURN[4]. Si es 1*/
+	it eq				/* si el resultado es 0 entonces, se ejecuta la siguiente instruccion, sino la ignora */
+	vpusheq {s16-s31}
 
-	mrs r0, msp
+	push {r4-r11,lr} 	/* salvo el resto del contexto. El lr es porque estoy estackeando el EXC_RETURN */
 
-	bl _os_get_next_context
+	mrs r0, msp			/* guardo el main stack pointer en r0 (argumento de _os_get_next_context) */
 
-	msr msp, r0   /* sp <= r0 */
+	bl _os_get_next_context	/* llamo a la funcion en C que devuelve el puntero al siguiente contexto. */
 
-	pop {r4-r11,lr}
+	msr msp, r0  		/* recupero el main stack pointer de r0 (return value de _os_get_next_context) */
+
+	pop {r4-r11,lr}		/* reestablezco el contexto. El lr es el EXC_RETURN */
+
+	tst lr, #0x00000010 /* testeo el bit EXC_RETURN[4]. Si es 1*/
+	it eq				/* si el resultado es 1 entonces, se ejecuta la siguiente instruccion, sino la ignora */
+	vpopeq {s16-s31}
 
  	cpsie f	/* enable isr */
 

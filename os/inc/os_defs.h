@@ -14,8 +14,8 @@
 /* types */
 #define TASK_COUNT_TYPE				uint32_t	//TODO: PROPAGAR ESTA DEFINICION POR TODOS LADOS...
 #define OS_PRIORITY_TYPE			unsigned char
-#define OS_EVENT_TYPE				uint32_t
-
+#define OS_EVENT_TYPE				uint32_t		//It stores FLAGS
+#define OS_DELAY_TYPE				uint32_t		//It stores a number of TICKS.
 
 /* Enum: task states */
 typedef enum
@@ -36,7 +36,7 @@ typedef struct
 #endif
 
     tTaskState 		state;	     					/* task state */
-    uint32_t		delay;							/* counter for delay ticks */
+    OS_DELAY_TYPE		delay;					    /* counter for delay ticks */
     OS_EVENT_TYPE   events_waiting;					/* events_waiting:  */
     OS_EVENT_TYPE   events_setted;					/* events_setted:  */
 } tTCB_Dyn;

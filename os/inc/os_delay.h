@@ -9,6 +9,6 @@
 #define OS_DELAY_H_
 
 void _os_delay_update();
-void osDelay( uint32_t delay_ms );
+void osDelay( OS_DELAY_TYPE delay_ms );
 
 #endif /* OS_DELAY_H_ */
