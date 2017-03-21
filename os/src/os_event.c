@@ -24,7 +24,12 @@
 extern const tTCB 		*os_tcbs[];
 extern unsigned short 	TASK_COUNT;
 extern tSched 			Sched;
-extern TASK_COUNT_TYPE	PRIO_TASKS[];
+extern tTCB *	os_sorted_Tcbs[];
+
+
+/* external os functions */
+extern void _os_task_block( tTCB *pTCB );
+extern void _os_schedule();
 
 /* set an evento to a task.
  * if the task is set to ready, it return 1, 0 otherwise. */
@@ -34,15 +39,17 @@ uint32_t _os_set_event_t( OS_EVENT_TYPE events , void *task_ref )
     uint32_t rv;
 
     OS_DISABLE_ISR();
-    pTCB->pDin->events_setted = events;
 
-    //tiene que esta bloqueada la tarea. si no esta bloqueada, no puede tener events_waiting != 0
+    /* sets setted flags */
+    pTCB->pDin->events_setted |= events;
+
+    /* if the task is waiting the event (if events_waiting != 0 the task MUST be in tskBLOCKED state ) */
     if( pTCB->pDin->events_waiting & events )
     {
+        /* clear waiting events. */
         pTCB->pDin->events_waiting &= ~ events;
 
-        //si la tarea estaba esperando el evento, entonces se pone en ready.
-
+        /* task becomes ready */
         _os_task_change_state( pTCB ,  osTskREADY );
 
         rv= 1;
@@ -74,14 +81,15 @@ void osSetEvent_T( OS_EVENT_TYPE events , void *task_ref )
     }
 }
 
+/* it sets an event to every task */
 void osSetEvent( OS_EVENT_TYPE events )
 {
     TASK_COUNT_TYPE i;
-    uint32_t count =0;
+    uint32_t count = 0;
 
     for( i=0 ; i<TASK_COUNT ; i++ )
     {
-        count  &= _os_set_event_t( events , ( tTCB * ) os_tcbs[i] );
+        count += _os_set_event_t( events , ( tTCB * ) os_tcbs[i] );
     }
 
     if( count )
@@ -89,6 +97,99 @@ void osSetEvent( OS_EVENT_TYPE events )
         _os_schedule();
     }
 }
+
+/* @brief Blocks the running task until an event hapens OR the timeout expires
+ * @param[in] events: Events to wait
+ * @param[in] timeout_ms: Timeout value in ms. If zero, there will be no wainting.
+ *                        If just  Delay in ms. If zero, the will be no delay.
+ *                        If OS_INFINITE the waiting will be forever, until the events happen
+ *                        (is the same as calling osWaitEvent( OS_EVENT_TYPE events ) )
+ * @return    Returns the flags that represents the event that happened. If a timeout happened, the return value will be zero.
+ * */
+OS_EVENT_TYPE osWaitEventT( OS_EVENT_TYPE events , OS_DELAY_TYPE timeout_ms )
+{
+    //es una mezcla de wait event con delay.
+    //creo que es igual a wait event pero al final hay que verificiar que el delay sea cero, o no.
+    //tambien si los eventos antes y despues del wait, siguen siendo los mismos...
+    //y hacer lo que haya uq ehacer.
+    //ver como devolver algo que indique si es timeout o no.
+
+    //por ahora copio la rutina waitevetn y modifico. luego optimizo
+
+    //si se llama a esta funcion esta en running
+    OS_EVENT_TYPE rv;
+
+    /* start critical section */
+    OS_DISABLE_ISR();
+
+    if( OS_CURRENT_TASK_TCB_REF->pDin->events_setted &  events || timeout_ms==0 )
+    {
+        /* some event was already setted.
+         * The Task wont wait, BUT we call the schedule anyway in order to let hight priority tasks to be run.  */
+
+        /* genero el valor de salida indicando que evento fue el que destrabo la tarea. */
+        rv = OS_CURRENT_TASK_TCB_REF->pDin->events_setted & events ;
+
+        /* limpio setted */
+        OS_CURRENT_TASK_TCB_REF->pDin->events_setted  &= ~ rv;
+
+        /* end critical section */
+        OS_ENABLE_ISR();
+
+        /* calls the schedule in order to evaluate if there is a ready higher priority task*/
+        _os_schedule();
+    }
+    else
+    {
+        if( timeout_ms != 0 && timeout_ms != OS_INFINITE )
+        {
+            /* load the timeout in the register  */
+            OS_CURRENT_TASK_TCB_REF->pDin->delay = timeout_ms;
+        }
+
+        OS_CURRENT_TASK_TCB_REF->pDin->events_waiting = events;
+
+        /* block the task and call schedluder()*/
+        _os_task_block( OS_CURRENT_TASK_TCB_REF );
+
+        /* at this point there are 2 schenarios.
+         * the delay ended, OR someone setted an event.
+         * So if the delay field is 0 the delay ended and events_waiting ^ events is zero
+         * or if events_waiting ^ events is zero !=0 and de delay != 0 then, an event happened.
+         *
+         * so, for evaluate this situation, we just have to evaluate one condition */
+
+        OS_DISABLE_ISR();
+
+        /* genero el valor de salida indicando que evento fue el que destrabo la tarea. */
+        rv = OS_CURRENT_TASK_TCB_REF->pDin->events_waiting ^ events;
+
+        /* if the user requested a timeout*/
+        if( timeout_ms != 0 && timeout_ms != OS_INFINITE )
+        {
+            if( rv == 0 )
+            {
+                /* a timeout happened */
+                /* clear waiting events (it simulates the SetEvent that didn't happen ) */
+                OS_CURRENT_TASK_TCB_REF->pDin->events_waiting &= ~ events;
+            }
+            else
+            {
+                /* an evento happened */
+                /* reset delay  (it simulates the Timeout that didn't happen )  */
+                OS_CURRENT_TASK_TCB_REF->pDin->delay = 0;
+            }
+        }
+
+        /* limpio setted */
+        OS_CURRENT_TASK_TCB_REF->pDin->events_setted  &= ~ rv;
+
+        OS_ENABLE_ISR();
+    }
+
+    return rv;
+}
+
 
 /*
  * espera cualquiera de los eventos definidos en "events".
@@ -100,41 +201,51 @@ OS_EVENT_TYPE osWaitEvent( OS_EVENT_TYPE events )
     //si se llama a esta funcion esta en running
     OS_EVENT_TYPE rv;
 
+    /* start critical section */
     OS_DISABLE_ISR();
 
-    if( os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->events_setted &  events )
+    if( OS_CURRENT_TASK_TCB_REF->pDin->events_setted &  events )
     {
-        //no espera nada.
-        //le borro los flags de setted
+        /* some event was already setted.
+         * The Task wont wait, BUT we call the schedule anyway in order to let hight priority tasks to be run.  */
 
         /* genero el valor de salida indicando que evento fue el que destrabo la tarea. */
-        rv = os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->events_setted & events ;
+        rv = OS_CURRENT_TASK_TCB_REF->pDin->events_setted & events ;
 
         /* limpio setted */
-        os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->events_setted  &= ~ rv;
+        OS_CURRENT_TASK_TCB_REF->pDin->events_setted  &= ~ rv;
 
+        /* end critical section */
         OS_ENABLE_ISR();
 
+        /* calls the schedule in order to evaluate if there is a ready higher priority task*/
         _os_schedule();
     }
     else
     {
-        os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->events_waiting = events;
+        OS_CURRENT_TASK_TCB_REF->pDin->events_waiting = events;
 
         /* block the task and call schedluder()*/
-        _os_task_block( OS_CURRENT_TASK_TCB_INDEX );
+        _os_task_block( OS_CURRENT_TASK_TCB_REF );
 
         OS_DISABLE_ISR();
 
         /* genero el valor de salida indicando que evento fue el que destrabo la tarea. */
-        rv = os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->events_waiting ^ events;
+        rv = OS_CURRENT_TASK_TCB_REF->pDin->events_waiting ^ events;
 
         /* limpio setted */
-        os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->events_setted  &= ~ rv;
+        OS_CURRENT_TASK_TCB_REF->pDin->events_setted  &= ~ rv;
 
         OS_ENABLE_ISR();
     }
 
     return rv;
+}
 
+/* It clears all events in the running task */
+void osClearEvents( void )
+{
+    OS_DISABLE_ISR();
+    OS_CURRENT_TASK_TCB_REF->pDin->events_setted;
+    OS_ENABLE_ISR();
 }

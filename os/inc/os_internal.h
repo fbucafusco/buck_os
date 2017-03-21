@@ -2,7 +2,7 @@
  * sched.h
  *
  *  Created on: 22/2/2017
- *      Author: franco.bucafusco
+ *  Author: franco.bucafusco
  */
 
 #ifndef OS_INTERNAL_H
@@ -15,7 +15,7 @@
 #include "board.h"
 
 #define MAX_STACK_SIZE 				512
-#define MIN_STACK_SIZE 				68      //TODO: CHANGE THIS..... 68 ES EL STACK PARA GUARDAR EL CONTEXTO, PERO ADEMAS SE NECESITA STACK PARA LA ISR DE TICK, Y LA DE PEND SV. Y TODOS SUS LLAMADOS. 
+#define MIN_STACK_SIZE 				68      //TODO: CHANGE THIS..... 68 ES EL STACK PARA GUARDAR EL CONTEXTO, PERO ADEMAS SE NECESITA STACK PARA LA ISR DE TICK, Y LA DE PEND SV. Y TODOS SUS LLAMADOS.
 
 #define INVALID_TASK				-1
 
@@ -34,7 +34,7 @@ enum
     OS_PRI_HIGHEST
 };
 
-#define OS_PRI_COUNT 5
+#define OS_PRI_COUNT 	5
 
 #define OS_IDLE_HOOK_PRIORITY 			0x55
 
@@ -50,8 +50,9 @@ uint32_t * idle_hook_sp;
 
 typedef struct
 {
-    int32_t current_task; /* current_running_task */
-    int32_t next_task; 	  /* next task to be run when there is a context change. */
+    TASK_COUNT_TYPE active_tasks;	/* number of tasks that are active */
+    TASK_COUNT_TYPE current_task; 	/* current_running_task */
+    TASK_COUNT_TYPE next_task; 	  	/* next task to be run when there is a context change. */
 
 #if( OS_INTERNAL_DELAY_WITH_MAIN_COUNTER== 1)
     int32_t main_delay_counter;
@@ -66,26 +67,25 @@ typedef struct
 /* RETURNS THE REFERENCE TO THE STACK FOR THE "TASK" */
 #define TASK_STACK_TOP(TASK)		(&TASK##_stack[0])
 
-
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-#define OS_TASKS_END_WITH_PRIO()	unsigned char PRIORITIES_COUNT[OS_PRI_COUNT];						 /* THIS ARRAY IS FILLED IN RUN TIME WITH THE AMOUNT OF TASKS THAT HAS OF EACH PRIO */ \
-									TASK_COUNT_TYPE PRIO_TASKS[sizeof(os_tcbs)/sizeof(os_tcbs[0]) ];   /*  \
-									DECLARE_PRIORITY_QUEUE(prioq, sizeof(os_tcbs)/sizeof(tTCB *) - 1, INVALID_TASK);*/
+#define OS_TASKS_END_WITH_PRIO()	TASK_COUNT_TYPE PRIORITIES_COUNT[OS_PRI_COUNT];						 /* THIS ARRAY IS FILLED IN RUN TIME WITH THE AMOUNT OF TASKS THAT HAS OF EACH PRIO */ \
+									tTCB *os_sorted_Tcbs[sizeof(os_tcbs)/sizeof(os_tcbs[0]) ];
 #else
 #define OS_TASKS_END_WITH_PRIO()	;
 #endif
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-/* For this policy, the current task tcb index is the one stored in the array PRIO_TASKS.
+/* For this policy, the current task tcb index is the one stored in the array os_sorted_Tcbs.
  * Sched.current_task just stores the index of this vector.
  *  is configured, the current task index is directly stored in Sched.current_task*/
-#define OS_CURRENT_TASK_TCB_INDEX		PRIO_TASKS[Sched.current_task]
-#define OS_NEXT_TASK_TCB_INDEX			PRIO_TASKS[Sched.next_task]
+#define OS_CURRENT_TASK_TCB_REF_(index)	os_sorted_Tcbs[(index)]
+#define OS_CURRENT_TASK_TCB_REF			OS_CURRENT_TASK_TCB_REF_(Sched.current_task)
+#define OS_NEXT_TASK_TCB_REF			os_sorted_Tcbs[Sched.next_task]
 #else
 /* if round robin is configured, the current task index is directly stored in Sched.current_task*/
-#define OS_CURRENT_TASK_TCB_INDEX		Sched.current_task
-#define OS_NEXT_TASK_TCB_INDEX			Sched.next_task
-//#define OS_CURRENT_TASK_TCB_INDEX_INVALID
+#define OS_CURRENT_TASK_TCB_REF		Sched.current_task
+#define OS_NEXT_TASK_TCB_REF			Sched.next_task
+//#define OS_CURRENT_TASK_TCB_REF_INVALID
 #endif
 
 
@@ -133,14 +133,12 @@ void idle_hook();
 																	.stackframe  = TASK_STACK_TOP(NOMBRE),	            \
 																	.stacksize   = sizeof(NOMBRE##_stack),		        \
 																	.pDin        = &NOMBRE##_Din, 				        \
-																	.priority    = PRI, 						        \
+																	.def_priority= PRI, 						        \
 																	.config      = CONFIG,						        \
 																};
 
-
-
 #define _I_OS_TASKS_START() \
-                            DECLARE_TASK(  idle_hook , NULL , OS_IDLE_HOOK_STACK_SIZE , OS_IDLE_HOOK_PRIORITY  , TASK_NOCONFIG); \
+                            DECLARE_TASK(  idle_hook , NULL , OS_IDLE_HOOK_STACK_SIZE , OS_IDLE_HOOK_PRIORITY , TASK_AUTOSTART ); \
 							const tTCB *os_tcbs[] = {
 
 #define _I_OS_ADD_TASK(TASK)						    TASK_TCB(TASK),

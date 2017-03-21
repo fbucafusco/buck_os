@@ -54,6 +54,6 @@ TASKNAME: Fantasy Name. The same name used in DECLARE_TASK_R
 
 
 /* os methods */
-
+void osTaskYield();
 
 #endif /* OS_H */

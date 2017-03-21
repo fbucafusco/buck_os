@@ -16,6 +16,6 @@
 
 
 void _os_task_change_state( tTCB *pTCB , tTaskState state );
-void _os_task_block( TASK_COUNT_TYPE index );
+
 
 #endif /* OS_TASKS_H */

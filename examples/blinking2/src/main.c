@@ -24,7 +24,6 @@ void AddStage( char a )
 }
 
 
-
 /* ************************
  * PARAMETERS FOR EACH TASK
  * ************************ */
@@ -33,7 +32,7 @@ tLedBlick leds[] =
     [0] =
     {
         .led_number  = 3 ,
-        .delay = 500,
+        .delay = 300,
     },
 
     [1] =
@@ -45,7 +44,7 @@ tLedBlick leds[] =
     [2] =
     {
         .led_number = 5 ,
-        .delay = 2000,
+        .delay = 50,
     },
 };
 
@@ -57,7 +56,7 @@ tLedBlick leds[] =
 DECLARE_TASK_R( task1 , generic_task_con_delay , &leds[0] , MAX_STACK_SIZE , 2 , TASK_AUTOSTART )
 
 /* DECLARACION DE TAREA 2 */
-/*DECLARE_TASK_R( task2 , generic_task_con_delay , &leds[1] , MAX_STACK_SIZE , 1  , TASK_AUTOSTART )*/
+DECLARE_TASK_R( task2 , generic_task_con_delay , &leds[1] , MAX_STACK_SIZE , 1  , TASK_AUTOSTART )
 
 /* DECLARACION DE TAREA 3 */
 DECLARE_TASK_R( task3 , task_wait , &leds[2] , MAX_STACK_SIZE , 1  , TASK_AUTOSTART ) //
@@ -65,7 +64,7 @@ DECLARE_TASK_R( task3 , task_wait , &leds[2] , MAX_STACK_SIZE , 1  , TASK_AUTOST
 
 DECLARE_OS_START()		/* INICIO DE CONFIGURACION DE OS */
 OS_ADD_TASK( task1 )
-//OS_ADD_TASK( task2 )
+OS_ADD_TASK( task2 )
 OS_ADD_TASK( task3 )
 DECLARE_OS_END()		/* FIN DE CONFIGURACION DE OS */
 
@@ -105,13 +104,17 @@ void generic_task_con_delay( void* arg )
 void task_wait( void* arg )
 {
     tLedBlick * led_config = ( tLedBlick * ) arg;
+    float a=0;
 
     while( 1 )
     {
         osWaitEvent( 0x0001 );
 
         Board_LED_Toggle( led_config->led_number );
-        osDelay( 50 );
+
+        a++;
+
+        osDelay( led_config->delay );
         Board_LED_Toggle( led_config->led_number );
         AddStage( 'S' );
     }

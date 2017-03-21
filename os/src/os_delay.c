@@ -12,7 +12,7 @@
 extern tSched Sched;
 extern const tTCB *os_tcbs[];
 extern unsigned short TASK_COUNT;
-extern TASK_COUNT_TYPE PRIO_TASKS[];
+extern tTCB * os_sorted_Tcbs[];
 
 /* in a tick, it checkes the delays */
 void _os_delay_update()
@@ -93,7 +93,9 @@ void _os_delay_update()
 }
 
 
-/* implements a blocking delay for the current running task */
+/* @brief implements a blocking delay for the current running task
+ * @param[in] delay_ms: Delay in ms. If zero, the will be no delay.
+ * */
 void osDelay( OS_DELAY_TYPE delay_ms )
 {
     OS_DELAY_TYPE ticks = delay_ms; //TODO: AGREGAR FACTOR DE ESCALA.
@@ -109,11 +111,11 @@ void osDelay( OS_DELAY_TYPE delay_ms )
         if( delay_ms >= Sched.main_delay_counter )
         {
             /* load the delay in the register  */
-            os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay = delay_ms;
+            OS_CURRENT_TASK_TCB_REF->pDin->delay = delay_ms;
 
             min_remain = _os_get_min_remain();	//va a haber un minimo porque arriba ya se actualizo
 
-            os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay  -= min_remain;
+            OS_CURRENT_TASK_TCB_REF->pDin->delay  -= min_remain;
 
             Sched.main_delay_counter = min_remain;
         }
@@ -123,7 +125,7 @@ void osDelay( OS_DELAY_TYPE delay_ms )
 
 
             /* load the delay in the register  */
-            os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay = 0;
+            OS_CURRENT_TASK_TCB_REF->pDin->delay = 0;
 
             /* a todos los otros remains, calculados con el tiempo parcial anterior se van a incrementar
              * en la dif */
@@ -131,7 +133,7 @@ void osDelay( OS_DELAY_TYPE delay_ms )
             {
                 if( os_tcbs[i]->pDin->state == osTskBLOCKED  )
                 {
-                    if( i != OS_CURRENT_TASK_TCB_INDEX )
+                    if( i != OS_CURRENT_TASK_TCB_REF )
                     {
                         os_tcbs[i]->pDin->delay += dif;
                     }
@@ -144,13 +146,11 @@ void osDelay( OS_DELAY_TYPE delay_ms )
 
 #else
         /* load the delay in the register  */
-        os_tcbs[OS_CURRENT_TASK_TCB_INDEX]->pDin->delay = delay_ms;
+        OS_CURRENT_TASK_TCB_REF->pDin->delay = delay_ms;
 #endif
 
-        //  OS_ENABLE_ISR();
-
         /* blockde task(it calls  the scheduler) */
-        _os_task_block( OS_CURRENT_TASK_TCB_INDEX );
+        _os_task_block( OS_CURRENT_TASK_TCB_REF );
     }
 }
 

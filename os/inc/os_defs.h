@@ -10,12 +10,22 @@
 
 #include "stdint.h"
 
-
 /* types */
-#define TASK_COUNT_TYPE				uint32_t	//TODO: PROPAGAR ESTA DEFINICION POR TODOS LADOS...
-#define OS_PRIORITY_TYPE			unsigned char
-#define OS_EVENT_TYPE				uint32_t		//It stores FLAGS
-#define OS_DELAY_TYPE				uint32_t		//It stores a number of TICKS.
+typedef uint32_t 			TASK_COUNT_TYPE;	//TODO: PROPAGAR ESTA DEFINICION POR TODOS LADOS...
+typedef unsigned char		OS_PRIORITY_TYPE;
+typedef uint32_t			OS_EVENT_TYPE;		//It stores FLAGS
+typedef uint32_t			OS_DELAY_TYPE;		//It stores a number of TICKS.
+
+typedef struct
+{
+    TASK_COUNT_TYPE owner_task;
+    char counter;
+} OS_MUTEX;
+
+/* constants */
+#define OS_INFINITE					(~((int)0))
+
+
 
 /* Enum: task states */
 typedef enum
@@ -26,33 +36,36 @@ typedef enum
     osTskBLOCKED
 } tTaskState;
 
-
 typedef struct
 {
-    uint32_t 		*sp;							/* stack pointer saved during context switching */
+    uint32_t 		   *sp;						/* stack pointer saved during context switching */
+
+    OS_PRIORITY_TYPE	current_priority;		/* task priority */
+
+    tTaskState 			state;	     			/* task state */
+
+    OS_DELAY_TYPE		delay;					/* counter for delay ticks */
+
+    OS_EVENT_TYPE   	events_waiting;			/* events_waiting:  */
+    OS_EVENT_TYPE   	events_setted;			/* events_setted:  */
+
+    OS_MUTEX			*pWainingMut;			/* mutex that is wainting the task */
 
 #if OS_FIXED_PIORITY == 0
-    OS_PRIORITY_TYPE	priority;		            /* task priority */
+    OS_PRIORITY_TYPE	priority_back;			/* task backup priority for priority inheritance*/
 #endif
-
-    tTaskState 		state;	     					/* task state */
-    OS_DELAY_TYPE		delay;					    /* counter for delay ticks */
-    OS_EVENT_TYPE   events_waiting;					/* events_waiting:  */
-    OS_EVENT_TYPE   events_setted;					/* events_setted:  */
 } tTCB_Dyn;
 
 
 typedef struct
 {
-    void 	( *entry_point )( void *arg ); /* pointer to the function associated with the task */
+    void 	( *entry_point )( void *arg ); 		/* pointer to the function associated with the task */
     void      *arg;								/* pointer to the argument for the ask  			*/
     uint32_t  *stackframe;						/* pointer to the array that stores the stack for the task */
     uint32_t   stacksize;						/* size of the stack array */
     uint32_t  config;							/* task configuration */
-    OS_PRIORITY_TYPE	  priority;				/* task priority (ficed) or initial priority (dinamic) */
+    OS_PRIORITY_TYPE	def_priority;		    /* task priority (fixed) or default priority (dynamic) */
     tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
 } tTCB;
-
-
 
 #endif /* OS_DEFS_H_ */
