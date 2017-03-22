@@ -54,6 +54,10 @@ TASKNAME: Fantasy Name. The same name used in DECLARE_TASK_R
 
 
 /* os methods */
+void osStart();
 void osTaskYield();
+void osTaskEnd();
+void osTaskStart( tTCB *pTCB );
+void osDelay( OS_DELAY_TYPE delay_ms );	//TODO: rename as osTaskDelay
 
 #endif /* OS_H */

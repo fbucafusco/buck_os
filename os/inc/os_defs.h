@@ -10,6 +10,12 @@
 
 #include "stdint.h"
 
+
+/* flags for task confoguration */
+#define TASK_NOCONFIG	0x0000000
+#define TASK_AUTOSTART	0x8000000
+
+
 /* types */
 typedef uint32_t 			TASK_COUNT_TYPE;	//TODO: PROPAGAR ESTA DEFINICION POR TODOS LADOS...
 typedef unsigned char		OS_PRIORITY_TYPE;

@@ -16,6 +16,6 @@
 
 
 void _os_task_change_state( tTCB *pTCB , tTaskState state );
-
+;
 
 #endif /* OS_TASKS_H */

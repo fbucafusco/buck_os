@@ -35,10 +35,10 @@ void idle_hook()
     int j;
     while( 1 )
     {
-        Board_LED_Toggle( 1 );
-        for ( j=0 ; j< 0xFFFFFF ; j++ )
-        {
-        }
+        //   Board_LED_Toggle( 1 );
+        //   for ( j=0 ; j< 0xFFFFFF ; j++ )
+        //   {
+        //   }
     }
 }
 
@@ -51,16 +51,6 @@ void generic_task_con_delay( void* arg )
 
     while( 1 )
     {
-        /*
-        a = ( ( uint32_t ) led_config - 	( uint32_t )&leds[0] ) / sizeof( tLedBlick );
-        a +=  '0';
-
-
-        OS_DISABLE_ISR()
-        temp[5]=a;
-        DEBUGSTR( temp );
-        OS_ENABLE_ISR()
-        */
         Board_LED_Toggle( led_config->led_number );
         osDelay( led_config->delay );
     }

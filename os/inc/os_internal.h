@@ -38,7 +38,7 @@ enum
 
 #define OS_IDLE_HOOK_PRIORITY 			0x55
 
-extern void idle_hook();
+
 
 /* Schedule Policies */
 #define osSchPolicyROUND_ROBIN			0
@@ -104,15 +104,6 @@ typedef struct
 
 #endif
 
-/* flags for task confoguration */
-#define TASK_NOCONFIG	0x0000000
-#define TASK_AUTOSTART	0x8000000
-
-/* os methods declaration */
-void osStart();
-void osDelay( uint32_t delay_ms );
-void idle_hook();
-
 
 
 /* FOR USE IN USER FUNCTIONS AS SetEvent, <agragar las otras que se puedan usar. s> */
@@ -123,7 +114,7 @@ void idle_hook();
 
 /* this declares a task that uses the same function name */
 #define _I_DECLARE_TASK_R( NOMBRE , FCNNAME , ARG , STACKSIZE, PRI, CONFIG)                                             							\
-																void FCNNAME(void*);							/* prototype for the FCN name */ 	\
+																extern void FCNNAME(void*);					    /* prototype for the FCN name */ 	\
                                                                 uint32_t	NOMBRE##_stack[(STACKSIZE)/4];	    /* stack array  */        			\
 																tTCB_Dyn    NOMBRE##_Din;		                /* Dynamic Part of each TCB  */    	\
 																const tTCB  NOMBRE##_TCB =				        /* Fixed part of each TCB   */  	\
@@ -135,15 +126,16 @@ void idle_hook();
 																	.pDin        = &NOMBRE##_Din, 				        \
 																	.def_priority= PRI, 						        \
 																	.config      = CONFIG,						        \
-																};
+																};														\
+																const tTCB* NOMBRE = &NOMBRE##_TCB;
 
 #define _I_OS_TASKS_START() \
-                            DECLARE_TASK(  idle_hook , NULL , OS_IDLE_HOOK_STACK_SIZE , OS_IDLE_HOOK_PRIORITY , TASK_AUTOSTART ); \
+							_I_DECLARE_TASK_R(  idle_hook_ , idle_hook,  NULL , OS_IDLE_HOOK_STACK_SIZE , OS_IDLE_HOOK_PRIORITY , TASK_AUTOSTART ); \
 							const tTCB *os_tcbs[] = {
 
 #define _I_OS_ADD_TASK(TASK)						    TASK_TCB(TASK),
 
-#define _I_OS_TASKS_END()	 							&idle_hook_TCB, \
+#define _I_OS_TASKS_END()	 							&idle_hook__TCB, \
 													}; 				    \
 							TASK_COUNT_TYPE TASK_COUNT = sizeof(os_tcbs)/sizeof(tTCB *) - 1 ;  /*the -1 is because the idle hook is the last in this array*/ \
 							OS_TASKS_END_WITH_PRIO();

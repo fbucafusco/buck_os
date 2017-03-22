@@ -8,6 +8,7 @@
 #include "os.h"
 #include "os_delay.h"
 #include "chip.h"
+#include <string.h>
 
 /* external objects thart are defined by the user */
 extern const tTCB *os_tcbs[];
@@ -24,14 +25,13 @@ extern void _os_task_not_active_( tTCB *pTCB );
 
 /* idle_hook
  * es llaado cuando el OS no tiene que ejecutar ninguna tarea. */
-__attribute__( ( weak ) ) void idle_hook()
+__attribute__( ( weak ) ) void idle_hook( void*arg )
 {
     while( 1 )
     {
 
     };
 }
-
 
 
 
@@ -211,7 +211,23 @@ uint32_t osRRP_SearchReadyTask( uint32_t from, uint32_t to )
  * */
 
 
+/* no se usa DEPRECATED */
+/*
+void _os_pp_rotate_subarray( TASK_COUNT_TYPE inicio, TASK_COUNT_TYPE fin )
+{
+    TASK_COUNT_TYPE i;
+    TASK_COUNT_TYPE back;
 
+    back = os_sorted_Tcbs[inicio];
+
+    for( i=inicio ; i < fin-1 ; i++ )
+    {
+        os_sorted_Tcbs[i] = os_sorted_Tcbs[i+1];
+    }
+
+    os_sorted_Tcbs[i] = back;
+
+}*/
 
 /* busca, en PRIO_TASK la primera de mas prioridad en ready. */
 uint32_t _os_pp_search_ready_task_coop()
@@ -312,8 +328,17 @@ uint32_t _os_pp_search_ready_task(  )
     return INVALID_TASK;
 }
 
-
 #endif
+
+void _os_trigger_cc()
+{
+    OS_DISABLE_ISR();
+    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+    __ISB(); //INSTRUCTION SYNCHRONIZATION BARRIER
+    __DSB(); //DATA SYNCHRONIZATION BARRIER
+    OS_ENABLE_ISR();
+}
+
 
 
 /* os_schedule() SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
@@ -400,14 +425,6 @@ void _os_schedule()
 }
 
 
-void _os_trigger_cc()
-{
-    OS_DISABLE_ISR();
-    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
-    __ISB(); //INSTRUCTION SYNCHRONIZATION BARRIER
-    __DSB(); //DATA SYNCHRONIZATION BARRIER
-    OS_ENABLE_ISR();
-}
 
 
 /* funcion llamada por pendsv para obtener el nuevo contexto.
@@ -524,7 +541,7 @@ void osStart()
         if( os_tcbs[i]->config & TASK_AUTOSTART )
         {
             /* init the task structure and objects regarding priority */
-            _os_task_active( os_tcbs[i] );
+            _os_task_active( (tTCB *) os_tcbs[i] );
 
             /* manage the priority algoritms objects */
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
@@ -532,7 +549,7 @@ void osStart()
             os_tcbs[i]->pDin->current_priority = os_tcbs[i]->def_priority;
 
             /* inicialmente las tareas estan desordenadas : TODO: si se implementara un "generator" estas tareas no seria necesarias y se podria dejar en un array const */
-            os_sorted_Tcbs[i] = os_tcbs[i] ;
+            os_sorted_Tcbs[i] = (tTCB *) os_tcbs[i] ;
             PRIORITIES_COUNT[os_tcbs[i]->def_priority]++;
 #endif
 
@@ -541,7 +558,7 @@ void osStart()
         }
         else
         {
-            _os_task_not_active_(  os_tcbs[i] );
+            _os_task_not_active_((tTCB *) os_tcbs[i] );
 
             /* manage the priority algoritms objects */
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
@@ -556,10 +573,10 @@ void osStart()
 #endif
 
     /* idle hook : special treatments */
-    _os_task_active( os_tcbs[OS_IDLE_TASK_INDEX] );
+    _os_task_active( (tTCB *) os_tcbs[OS_IDLE_TASK_INDEX] );
 
     /* initiates one element in the os_sorted_array */
-    os_sorted_Tcbs[OS_IDLE_TASK_INDEX] =  os_tcbs[OS_IDLE_TASK_INDEX] ;
+    os_sorted_Tcbs[OS_IDLE_TASK_INDEX] =  (tTCB *) os_tcbs[OS_IDLE_TASK_INDEX] ;
 
     /* inicio el tick */
     SysTick_Config( SystemCoreClock/1000 );
