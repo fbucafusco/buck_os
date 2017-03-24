@@ -5,15 +5,15 @@
 #define MAJOR_MULT             10000000
 #define MINOR_MULT             100000
 
-#define VERSION_FULL           0.0.183.0
+#define VERSION_FULL           0.0.196.0
 
 #define VERSION_BASEYEAR       0
-#define VERSION_DATE           "2017-03-22"
-#define VERSION_TIME           "23:00:30"
+#define VERSION_DATE           "2017-03-24"
+#define VERSION_TIME           "03:17:54"
 
 #define VERSION_MAJOR          0
 #define VERSION_MINOR          0
-#define VERSION_BUILDNO        183
+#define VERSION_BUILDNO        196
 #define VERSION_EXTEND         0
 
 #define SET_FIRWARE(V,SV,BN)		(V*MAJOR_MULT + SV*MINOR_MULT + BN ) //

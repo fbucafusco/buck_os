@@ -20,8 +20,9 @@ extern unsigned short 	TASK_COUNT;
 extern void _os_task_block( tTCB *pTCB );
 extern void _os_schedule();
 extern void _os_pp_sort_prio_array();
-
-
+extern TASK_COUNT_TYPE _os_pp_sort_prio_array_ti( TASK_COUNT_TYPE index );
+extern void _os_trigger_cc_conditional( tSched *pSched  );
+extern TASK_COUNT_TYPE _os_get_next( TASK_COUNT_TYPE current_task );
 /* idle_hook
  * es llaado cuando el OS no tiene que ejecutar ninguna tarea. */
 __attribute__( ( weak ) ) void return_hook()
@@ -122,10 +123,8 @@ void _os_task_active( tTCB *pTCB )
     _os_tcb_init_stack( pTCB );
 }
 
-
-
 /* it starts one task and puts it in ready */
-void osTaskStart( tTCB *pTCB )
+void osTaskStart( const tTCB *pTCB )
 {
     //Verificar que la tarea no este arrancada
     //si no esta arrancada, hay que inicializar la estructura.
@@ -140,9 +139,10 @@ void osTaskStart( tTCB *pTCB )
         /* initialize task data (without prio objects) */
         _os_task_active( pTCB );
 
+        Sched.active_tasks++;
+
         /* manage the priority algoritms objects */
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-
         /* copy the defauult prio to the current_priority location */
         pTCB->pDin->current_priority = pTCB->def_priority;
 
@@ -151,14 +151,20 @@ void osTaskStart( tTCB *pTCB )
         os_sorted_Tcbs[TASK_COUNT-1] = pTCB ;
 
         /* we increment the task count for the priority */
-        PRIORITIES_COUNT[pTCB->def_priority]++;
+        PRIORITIES_COUNT[pTCB->pDin->current_priority]++;
 
-        /* se ordena el array de prioridades. */
-        _os_pp_sort_prio_array();
+        /* se ordena el array de prioridades haciendo tracking de la tarea next */
+        Sched.current_task = _os_pp_sort_prio_array_ti( Sched.current_task ) ;
 #endif
-    }
 
-    OS_ENABLE_ISR();
+        OS_ENABLE_ISR();
+
+        _os_schedule();
+    }
+    else
+    {
+        OS_ENABLE_ISR();
+    }
 }
 
 /* termina la tarea que esta corriendo*/
@@ -169,21 +175,32 @@ void osTaskEnd()
     /*but the task in ready state */
     _os_task_change_state( OS_CURRENT_TASK_TCB_REF ,  osTskNOT_ACTIVE );
 
+    Sched.active_tasks--;
+
+    /* first we calculate the next task AS THIS TASK IS NOT DEAD */
+    TASK_COUNT_TYPE next = _os_get_next( Sched.current_task );
+
+    /* */
+
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
     /* remove the task from the priority count array */
     PRIORITIES_COUNT[OS_CURRENT_TASK_TCB_REF->def_priority]--;
 
+    /* kills the task from os_sorted_Tcbs array */
     os_sorted_Tcbs[Sched.current_task] = NULL ;
 
-    /* se ordena el array de prioridades. */
-    _os_pp_sort_prio_array();
+    /* se ordena el array de prioridades haciendo tracking de la tarea next */
+    next = _os_pp_sort_prio_array_ti( next ) ;
 #endif
 
+    Sched.current_task = INVALID_TASK; /* esto va a reiniciar el RR en la misma prioridad de la tarea que se va. */
+    Sched.next_task    = next;
 
     OS_ENABLE_ISR();
 
+    /* triggers cc*/
+    _os_trigger_cc_conditional( &Sched  );
     /* call the scheduler */
-    _os_schedule();
 }
 
 

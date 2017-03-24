@@ -9,6 +9,7 @@
 #include "os_defs.h"
 #include "os_internal.h"
 
+/* external os objects */
 extern const tTCB 		*os_tcbs[];
 extern unsigned short 	TASK_COUNT;
 extern tSched 			Sched;
@@ -18,6 +19,7 @@ extern tTCB *	os_sorted_Tcbs[];
 extern void _os_task_block( tTCB *pTCB );
 extern void _os_schedule();
 extern OS_PRIORITY_TYPE _os_pp_get_next_prio( OS_PRIORITY_TYPE curr_prio );
+extern void _os_pp_change_task_priority( TASK_COUNT_TYPE index, OS_PRIORITY_TYPE newpriority );
 
 /*
  * el mutex lo tiene que tomar y liberar la misma tarea.
@@ -107,10 +109,10 @@ void osMutexRelease( OS_MUTEX *pM )
 
             for( i=0; i<TASK_COUNT; i++ )
             {
-                if( OS_CURRENT_TASK_TCB_REF_( i )->pDin->pWainingMut == pM )
+                if( OS_TASK_TCB_REF_( i )->pDin->pWainingMut == pM )
                 {
                     /* */
-                    OS_CURRENT_TASK_TCB_REF_( i )->pDin->state = osTskREADY;
+                    OS_TASK_TCB_REF_( i )->pDin->state = osTskREADY;
                     break;
                 }
             }
@@ -120,6 +122,6 @@ void osMutexRelease( OS_MUTEX *pM )
     }
     else
     {
-        //return TODO MAL.
+
     }
 }

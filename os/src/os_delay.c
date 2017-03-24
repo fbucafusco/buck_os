@@ -9,10 +9,14 @@
 #include "os_tasks.h"
 #include "os_delay.h"
 
+/* external os objects */
 extern tSched Sched;
 extern const tTCB *os_tcbs[];
 extern unsigned short TASK_COUNT;
 extern tTCB * os_sorted_Tcbs[];
+
+/* external os functions */
+extern void _os_task_block( tTCB *pTCB );
 
 /* in a tick, it checkes the delays */
 void _os_delay_update()

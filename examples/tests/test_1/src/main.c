@@ -44,7 +44,7 @@ void SequenceEnd()
     int j;
     while( 1 )
     {
-        if( !secuence_invalid )
+        if( secuence_invalid==0 )
         {
             Board_LED_Toggle( 1 );
         }
@@ -86,13 +86,13 @@ tLedBlick leds[] =
 
 
 /* DECLARACION DE TAREA 1 */
-DECLARE_TASK_R( task1 , master_task , &leds[0] , MAX_STACK_SIZE , 1 , TASK_AUTOSTART )
+DECLARE_TASK_R( task1 , master_task , &leds[0] , MAX_STACK_SIZE , OS_PRI_LOW , TASK_AUTOSTART )
 
 /* DECLARACION DE TAREA 2 */
-DECLARE_TASK_R( task2 , led_task2 , &leds[1] , MAX_STACK_SIZE , 1  , TASK_NOCONFIG )
+DECLARE_TASK_R( task2 , led_task2 , &leds[1] , MAX_STACK_SIZE , OS_PRI_LOW  , TASK_NOCONFIG )
 
 /* DECLARACION DE TAREA 3 */
-DECLARE_TASK_R( task3 , led_task3 , &leds[2] , MAX_STACK_SIZE , 1  , TASK_NOCONFIG )
+DECLARE_TASK_R( task3 , led_task3 , &leds[2] , MAX_STACK_SIZE , OS_PRI_LOW  , TASK_NOCONFIG )
 
 /* sobrecargo la idle hook */
 void idle_hook( void*arg )
@@ -146,7 +146,8 @@ void master_task( void* arg )
 
     counter++;
 
-    /* we start the task2 and as it has the same priority, it comes next in the scheduling */
+    /* we start the task2 and as it has the same priority,
+     * it comes next in the scheduling because of the round robin.*/
     osTaskStart( task2 );
 
     Sequence( 3 );
@@ -157,6 +158,7 @@ void master_task( void* arg )
 
     osDelay( 1000 );
 
+    Sequence( 8 );
 
     SequenceEnd();
 }

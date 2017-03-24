@@ -10,6 +10,16 @@
 
 #include "stdint.h"
 
+/* priorities */
+/* priority is higher when the value of the priority is the higher */
+enum
+{
+    OS_PRI_LOWEST = 0,
+    OS_PRI_LOW 	  = 1,
+    OS_PRI_MID	  = 2,
+    OS_PRI_HIGH	  = 3,
+    OS_PRI_HIGHEST = 4
+};
 
 /* flags for task confoguration */
 #define TASK_NOCONFIG	0x0000000

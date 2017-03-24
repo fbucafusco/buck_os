@@ -5,7 +5,7 @@
 
 typedef struct
 {
-	float 		value;
+    float 		value;
     float       init_value;
 } tVariableFloat;
 
@@ -69,13 +69,13 @@ void idle_hook( void*arg )
 void task_add_float( void* arg )
 {
 
-	tVariableFloat *pVar = (tVariableFloat*) arg;
+    tVariableFloat *pVar = ( tVariableFloat* ) arg;
 
-	pVar->value = pVar->init_value;
+    pVar->value = pVar->init_value;
 
     while( 1 )
     {
-    	pVar->value++;
+        pVar->value++;
     }
 }
 

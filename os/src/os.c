@@ -62,6 +62,7 @@ void _os_pp_sort_prio_array()
     {
         for( j=0; j< TASK_COUNT-i-1; j++ )
         {
+            /* criteria for interchange elements */
             if( os_sorted_Tcbs[j+1]!= NULL )
             {
                 if( os_sorted_Tcbs[j]==NULL )
@@ -70,8 +71,9 @@ void _os_pp_sort_prio_array()
                 }
                 else
                 {
-                    OS_PRIORITY_TYPE pri_j = os_sorted_Tcbs[j]->pDin->current_priority;
-                    OS_PRIORITY_TYPE pri_j_1 =  os_sorted_Tcbs[j+1]->pDin->current_priority;
+                    OS_PRIORITY_TYPE pri_j 		= os_sorted_Tcbs[j]->pDin->current_priority;
+                    OS_PRIORITY_TYPE pri_j_1 	= os_sorted_Tcbs[j+1]->pDin->current_priority;
+
                     if( pri_j < pri_j_1 )
                     {
                         interambiar = 1;
@@ -87,9 +89,10 @@ void _os_pp_sort_prio_array()
                 interambiar = 0;
             }
 
+            /* if elements has to be interchanged */
             if( interambiar )
             {
-                swap       		= os_sorted_Tcbs[j+1];
+                swap       			= os_sorted_Tcbs[j+1];
                 os_sorted_Tcbs[j+1] = os_sorted_Tcbs[j];
                 os_sorted_Tcbs[j] 	= swap;
             }
@@ -107,21 +110,52 @@ TASK_COUNT_TYPE _os_pp_sort_prio_array_ti( TASK_COUNT_TYPE index )
 {
     TASK_COUNT_TYPE i, j ;
     tTCB *swap;
+    uint32_t interambiar;
 
     for( i=0; i< TASK_COUNT-1; i++ )
     {
         for( j=0; j< TASK_COUNT-i-1; j++ )
         {
-            if( os_sorted_Tcbs[j]==NULL ||
-                    os_sorted_Tcbs[j]->pDin->current_priority < os_sorted_Tcbs[j+1]->pDin->current_priority
-              )
+            /* criteria for interchange elements */
+            if( os_sorted_Tcbs[j+1]!= NULL )
+            {
+                if( os_sorted_Tcbs[j]==NULL )
+                {
+                    interambiar = 1;
+                }
+                else
+                {
+                    OS_PRIORITY_TYPE pri_j 		= os_sorted_Tcbs[j]->pDin->current_priority;
+                    OS_PRIORITY_TYPE pri_j_1 	= os_sorted_Tcbs[j+1]->pDin->current_priority;
+
+                    if( pri_j < pri_j_1 )
+                    {
+                        interambiar = 1;
+                    }
+                    else
+                    {
+                        interambiar = 0;
+                    }
+                }
+            }
+            else
+            {
+                interambiar = 0;
+            }
+
+            /* if elements has to be interchanged */
+            if( interambiar )
             {
                 if( index == j )
                 {
                     index = j+1;
                 }
+                else if( index == j+1 )
+                {
+                    index = j ;
+                }
 
-                swap       		= os_sorted_Tcbs[j+1];
+                swap       			= os_sorted_Tcbs[j+1];
                 os_sorted_Tcbs[j+1] = os_sorted_Tcbs[j];
                 os_sorted_Tcbs[j] 	= swap;
             }
@@ -229,7 +263,7 @@ void _os_pp_rotate_subarray( TASK_COUNT_TYPE inicio, TASK_COUNT_TYPE fin )
 
 }*/
 
-/* busca, en PRIO_TASK la primera de mas prioridad en ready. */
+/* busca, en os_sorted_Tcbs la primera de mas prioridad en ready. */
 uint32_t _os_pp_search_ready_task_coop()
 {
     TASK_COUNT_TYPE i;
@@ -245,9 +279,9 @@ uint32_t _os_pp_search_ready_task_coop()
     return INVALID_TASK;
 }
 
-/* busca en los TCBs desde el indice 0 a TASK_COUNT (no inclusive)
+/* busca en los os_sorted_Tcbs desde el indice 0 a TASK_COUNT (no inclusive)
  * las tareas ready mas prioritarias */
-uint32_t _os_pp_search_ready_task(  )
+TASK_COUNT_TYPE _os_pp_search_ready_task( TASK_COUNT_TYPE current_task )
 {
     TASK_COUNT_TYPE i;
     TASK_COUNT_TYPE j;
@@ -289,15 +323,15 @@ uint32_t _os_pp_search_ready_task(  )
             i_max 	= PRIORITIES_COUNT[pri];
 
             /* determino si la tarea actual esta en esta prioridad */
-            if( Sched.current_task >= i+j && Sched.current_task < i_max+j )
+            if( current_task >= i+j && current_task < i_max+j )
             {
                 /* si esta en esta prioridad, le tengo que dar el comportamiento de RR.
                  * o sea, que comienzo a "mirar" por tareas en ready desde la actual. */
-                i =  Sched.current_task-j;
+                i =  current_task - j ;
             }
             else
             {
-                /* si la prioridad actual no esta en esta priodidad arranco desde la primera
+                /* si la prioridad actual no esta en esta priodidad, arranco desde la primera
                  * tarea que hay en la seccion del array */
                 i = PRIORITIES_COUNT[pri]-1;
             }
@@ -340,17 +374,16 @@ void _os_trigger_cc()
 }
 
 
-
-/* os_schedule() SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
-* No debe modificar el estado de ninguna tarea.
-* */
-void _os_schedule()
+/*
+ * decide virtualmente que tarea será la proxima
+ * basado en el current task.
+ * NOT THREAD SAFE
+ * */
+TASK_COUNT_TYPE _os_get_next( TASK_COUNT_TYPE current_task )
 {
-    uint32_t next;
+    TASK_COUNT_TYPE rv;
 
-    OS_DISABLE_ISR();
-
-    if( Sched.current_task == INVALID_TASK || Sched.current_task == OS_IDLE_TASK_INDEX )
+    if( current_task == INVALID_TASK || current_task == OS_IDLE_TASK_INDEX )
     {
 #if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
         /* busco la primera tarea en ready */
@@ -358,61 +391,86 @@ void _os_schedule()
 #endif
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
-        next = _os_pp_search_ready_task_coop();
+        rv = _os_pp_search_ready_task_coop( Sched.current_task );
 #endif
 
-        if( next == INVALID_TASK )
+        if( rv == INVALID_TASK )
         {
             //no hay ninguna ready
 
             /* TENGO QUE EJECUTAR IDLE_TASK.... */
-            Sched.next_task = OS_IDLE_TASK_INDEX;
+            rv = OS_IDLE_TASK_INDEX;
         }
         else
         {
             // Ok! encontre una ready
-            Sched.next_task = next;
+            //Sched.next_task = next;
         }
     }
     else
     {
-
 #if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
 #error REARMAR ESTA PARTE.
         /* busco la siguiente tarea en ready */
-        next = osRRP_SearchReadyTask(  Sched.current_task + 1 , TASK_COUNT );
+        rv = osRRP_SearchReadyTask(  current_task + 1 , TASK_COUNT );
 
-        if( next == INVALID_TASK )
+        if( rv == INVALID_TASK )
         {
             //no encontro
-            next = osRRP_SearchReadyTask( 0 , Sched.current_task );
+            rv = osRRP_SearchReadyTask( 0 , current_task );
         }
 #endif
 
 
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
         /* busco la primera tarea en ready con mayor prioridad */
-        next =  _os_pp_search_ready_task();
+        rv =  _os_pp_search_ready_task( current_task );
 #endif
 
-        if( next == INVALID_TASK )
+        if( rv == INVALID_TASK )
         {
             /* evaluo que paso con current task
                puede estar en running, por lo que la dejo asi.
                puede estar bloqueada: En este caso, la proxima tarea va a ser idle, porque la bloqueada y las otras
                no estan ready.  */
 
-            if( OS_CURRENT_TASK_TCB_REF->pDin->state==osTskBLOCKED )
+            if( OS_TASK_TCB_REF_( current_task )->pDin->state==osTskBLOCKED )
             {
-                Sched.next_task = OS_IDLE_TASK_INDEX;
+                rv = OS_IDLE_TASK_INDEX;
             }
         }
         else
         {
             //ok! encontre una ready
-            Sched.next_task = next;
+            //Sched.next_task = next;
         }
     }
+
+    return rv;
+}
+
+void _os_trigger_cc_conditional( tSched *pSched  )
+{
+    OS_DISABLE_ISR();
+    uint32_t condicion_cc = ( pSched->next_task != pSched->current_task && pSched->next_task != INVALID_TASK );
+    OS_ENABLE_ISR();
+
+    if( condicion_cc )
+    {
+        _os_trigger_cc();
+    }
+}
+
+/* os_schedule() SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
+* No debe modificar el estado de ninguna tarea.
+* */
+void _os_schedule()
+{
+    TASK_COUNT_TYPE next;
+
+    OS_DISABLE_ISR();
+
+    Sched.next_task = _os_get_next( Sched.current_task );
 
     uint32_t condicion_cc = ( Sched.next_task != Sched.current_task && Sched.next_task != INVALID_TASK );
 
@@ -423,8 +481,6 @@ void _os_schedule()
         _os_trigger_cc();
     }
 }
-
-
 
 
 /* funcion llamada por pendsv para obtener el nuevo contexto.
@@ -541,7 +597,7 @@ void osStart()
         if( os_tcbs[i]->config & TASK_AUTOSTART )
         {
             /* init the task structure and objects regarding priority */
-            _os_task_active( (tTCB *) os_tcbs[i] );
+            _os_task_active( ( tTCB * ) os_tcbs[i] );
 
             /* manage the priority algoritms objects */
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
@@ -549,8 +605,9 @@ void osStart()
             os_tcbs[i]->pDin->current_priority = os_tcbs[i]->def_priority;
 
             /* inicialmente las tareas estan desordenadas : TODO: si se implementara un "generator" estas tareas no seria necesarias y se podria dejar en un array const */
-            os_sorted_Tcbs[i] = (tTCB *) os_tcbs[i] ;
-            PRIORITIES_COUNT[os_tcbs[i]->def_priority]++;
+            os_sorted_Tcbs[i] = ( tTCB * ) os_tcbs[i] ;
+
+            PRIORITIES_COUNT[os_tcbs[i]->pDin->current_priority]++;
 #endif
 
             /* increment the active task count */
@@ -558,7 +615,7 @@ void osStart()
         }
         else
         {
-            _os_task_not_active_((tTCB *) os_tcbs[i] );
+            _os_task_not_active_( ( tTCB * ) os_tcbs[i] );
 
             /* manage the priority algoritms objects */
 #if OS_SCHEDULE_POLICY==osSchPolicyPRIORITY
@@ -573,10 +630,10 @@ void osStart()
 #endif
 
     /* idle hook : special treatments */
-    _os_task_active( (tTCB *) os_tcbs[OS_IDLE_TASK_INDEX] );
+    _os_task_active( ( tTCB * ) os_tcbs[OS_IDLE_TASK_INDEX] );
 
     /* initiates one element in the os_sorted_array */
-    os_sorted_Tcbs[OS_IDLE_TASK_INDEX] =  (tTCB *) os_tcbs[OS_IDLE_TASK_INDEX] ;
+    os_sorted_Tcbs[OS_IDLE_TASK_INDEX] =  ( tTCB * ) os_tcbs[OS_IDLE_TASK_INDEX] ;
 
     /* inicio el tick */
     SysTick_Config( SystemCoreClock/1000 );
