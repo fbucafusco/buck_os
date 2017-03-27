@@ -179,31 +179,31 @@ void _os_pp_sort_prio_count_move( OS_PRIORITY_TYPE from, OS_PRIORITY_TYPE to )
  *
  * NO ES THREAD SAFE.
  * */
-void _os_pp_change_task_priority( TASK_COUNT_TYPE index, OS_PRIORITY_TYPE newpriority )
+void _os_pp_change_task_priority( tTCB *pTCB, OS_PRIORITY_TYPE newpriority )
 {
     /* update the priority count array */
-    _os_pp_sort_prio_count_move( os_tcbs[index]->pDin->current_priority , newpriority );
+    _os_pp_sort_prio_count_move( pTCB->pDin->current_priority , newpriority );
 
     /* set the new priority */
-    os_tcbs[index]->pDin->current_priority = newpriority;
+    pTCB->pDin->current_priority = newpriority;
 
     /* sort the priority array and update the current_task relative index */
     Sched.current_task = _os_pp_sort_prio_array_ti( Sched.current_task );
 }
 
-void _os_pp_restore_task_priority( TASK_COUNT_TYPE index )
+void _os_pp_restore_task_priority( tTCB *pTCB )
 {
     OS_PRIORITY_TYPE original_prio;
 
     /* restores the original priority*/
 #if OS_FIXED_PIORITY == 0
-    original_prio = os_tcbs[index]->pDin->priority_back;
+    original_prio = pTCB->pDin->priority_back;
 #else
-    original_prio = os_tcbs[index]->def_priority;
+    original_prio = pTCB->def_priority;
 #endif
 
     /* cambio la prioridad */
-    _os_pp_change_task_priority( index , original_prio );
+    _os_pp_change_task_priority( pTCB , original_prio );
 }
 
 
@@ -466,8 +466,6 @@ void _os_trigger_cc_conditional( tSched *pSched  )
 * */
 void _os_schedule()
 {
-    TASK_COUNT_TYPE next;
-
     OS_DISABLE_ISR();
 
     Sched.next_task = _os_get_next( Sched.current_task );

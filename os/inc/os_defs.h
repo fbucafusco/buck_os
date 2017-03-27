@@ -32,11 +32,7 @@ typedef unsigned char		OS_PRIORITY_TYPE;
 typedef uint32_t			OS_EVENT_TYPE;		//It stores FLAGS
 typedef uint32_t			OS_DELAY_TYPE;		//It stores a number of TICKS.
 
-typedef struct
-{
-    TASK_COUNT_TYPE owner_task;
-    char counter;
-} OS_MUTEX;
+
 
 /* constants */
 #define OS_INFINITE					(~((int)0))
@@ -51,6 +47,13 @@ typedef enum
     osTskRUNNING,
     osTskBLOCKED
 } tTaskState;
+
+
+typedef struct
+{
+    void *owner_task;
+    char counter;
+} OS_MUTEX;
 
 typedef struct
 {
@@ -83,5 +86,7 @@ typedef struct
     OS_PRIORITY_TYPE	def_priority;		    /* task priority (fixed) or default priority (dynamic) */
     tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
 } tTCB;
+
+
 
 #endif /* OS_DEFS_H_ */
