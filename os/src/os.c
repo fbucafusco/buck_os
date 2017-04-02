@@ -15,13 +15,15 @@ extern const tTCB *os_tcbs[];
 extern unsigned short TASK_COUNT;
 extern TASK_COUNT_TYPE PRIORITIES_COUNT[OS_PRI_COUNT];
 extern tTCB * os_sorted_Tcbs[];
-
+extern const void ( * os_User_Isr_Handlers[] )() ;
+extern const uint16_t USER_ISR_COUNT;
 tSched Sched;
 
 /* extern os functions */
 extern void _os_task_start( TASK_COUNT_TYPE absolute_index );
 extern void _os_task_active( tTCB *pTCB );
 extern void _os_task_not_active_( tTCB *pTCB );
+extern uint32_t _os_get_running_isr_handler( void );
 
 /* idle_hook
  * es llaado cuando el OS no tiene que ejecutar ninguna tarea. */
@@ -29,21 +31,20 @@ __attribute__( ( weak ) ) void idle_hook( void*arg )
 {
     while( 1 )
     {
-
+        __WFI;
     };
 }
-
 
 
 /* increment the priority to the next high available priorirty */
 OS_PRIORITY_TYPE _os_pp_get_next_prio( OS_PRIORITY_TYPE curr_prio )
 {
-    if( curr_prio==OS_PRI_HIGHEST )
+    if( curr_prio == OS_PRI_HIGHEST )
     {
         return OS_PRI_HIGHEST;
     }
 
-    return curr_prio+1;
+    return curr_prio + 1;
 }
 
 /* Ordena el array os_sorted_Tcbs segun las prioridades de las tareas que éste referencia.
@@ -206,13 +207,6 @@ void _os_pp_restore_task_priority( tTCB *pTCB )
     _os_pp_change_task_priority( pTCB , original_prio );
 }
 
-
-
-/*
- * PRIORITIES_COUNT[os_tcbs[i]->def_priority]++;
- * */
-
-
 #if OS_SCHEDULE_POLICY==osSchPolicyROUND_ROBIN
 /* politica de scheduling:
  * en cada tick se hace cambio de contexto a la tarea siguiente.
@@ -243,25 +237,6 @@ uint32_t osRRP_SearchReadyTask( uint32_t from, uint32_t to )
 /* politica de scheduling:
  * se busca la tarea en ready mas prioritaria
  * */
-
-
-/* no se usa DEPRECATED */
-/*
-void _os_pp_rotate_subarray( TASK_COUNT_TYPE inicio, TASK_COUNT_TYPE fin )
-{
-    TASK_COUNT_TYPE i;
-    TASK_COUNT_TYPE back;
-
-    back = os_sorted_Tcbs[inicio];
-
-    for( i=inicio ; i < fin-1 ; i++ )
-    {
-        os_sorted_Tcbs[i] = os_sorted_Tcbs[i+1];
-    }
-
-    os_sorted_Tcbs[i] = back;
-
-}*/
 
 /* busca, en os_sorted_Tcbs la primera de mas prioridad en ready. */
 uint32_t _os_pp_search_ready_task_coop()
@@ -373,7 +348,6 @@ void _os_trigger_cc()
     OS_ENABLE_ISR();
 }
 
-
 /*
  * decide virtualmente que tarea será la proxima
  * basado en el current task.
@@ -461,10 +435,10 @@ void _os_trigger_cc_conditional( tSched *pSched  )
     }
 }
 
-/* os_schedule() SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
-* No debe modificar el estado de ninguna tarea.
-* */
-void _os_schedule()
+
+
+/* it does a schedule in any context. */
+void _os_force_schedule()
 {
     OS_DISABLE_ISR();
 
@@ -480,6 +454,18 @@ void _os_schedule()
     }
 }
 
+/* os_schedule()
+ * SOLO debe definir quien es la siguiente tarea a ejecutarse (Sched.next_task)
+ * No debe modificar el estado de ninguna tarea.
+ * */
+void _os_schedule()
+{
+    /* I only schedule if the execution is not at ISR level. */
+    if( _os_get_running_isr_handler() ==  BASE_LEVEL_ISR_NRO )
+    {
+        _os_force_schedule();
+    }
+}
 
 /* funcion llamada por pendsv para obtener el nuevo contexto.
  *
@@ -633,6 +619,22 @@ void osStart()
     /* initiates one element in the os_sorted_array */
     os_sorted_Tcbs[OS_IDLE_TASK_INDEX] =  ( tTCB * ) os_tcbs[OS_IDLE_TASK_INDEX] ;
 
+
+    /* enable al USER ISR HANDLERS */
+    for( i=0 ; i<USER_ISR_COUNT ; i++ )
+    {
+        NVIC_ClearPendingIRQ( i );
+
+        if( os_User_Isr_Handlers[i] != NULL )
+        {
+            NVIC_EnableIRQ( i );
+        }
+        else
+        {
+            NVIC_DisableIRQ( i );
+        }
+    }
+
     /* inicio el tick */
     SysTick_Config( SystemCoreClock/1000 );
 }
@@ -642,9 +644,8 @@ void osStart()
 void SysTick_Handler()
 {
     _os_delay_update();
-    _os_schedule();
+    _os_force_schedule();
 }
-
 
 //TODO: implementar time slice. Ahora el slice es de 1 tick.
 //TODO: implementar mutex wait con timeout

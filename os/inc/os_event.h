@@ -14,6 +14,6 @@ OS_EVENT_TYPE osWaitEvent( OS_EVENT_TYPE events );
 OS_EVENT_TYPE osWaitEventT( OS_EVENT_TYPE events , OS_DELAY_TYPE timeout_ms );
 void osSetEvent( OS_EVENT_TYPE events );
 void osSetEvent_T( OS_EVENT_TYPE events , void *task_ref );
-void osClearEvents( void );
+void osClearEvents( OS_EVENT_TYPE events );
 
 #endif /* OS_EVENT_H_ */

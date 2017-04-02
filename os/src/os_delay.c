@@ -97,7 +97,9 @@ void _os_delay_update()
 }
 
 
-/* @brief implements a blocking delay for the current running task
+/* @brief Implements a blocking delay for the current running task.
+ *        DO NOT CALL IT FROM A ISR HANDLER
+ *        (it will put into delay state the running task, whichever it is)
  * @param[in] delay_ms: Delay in ms. If zero, the will be no delay.
  * */
 void osDelay( OS_DELAY_TYPE delay_ms )

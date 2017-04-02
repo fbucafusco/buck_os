@@ -33,9 +33,9 @@ typedef uint32_t			OS_EVENT_TYPE;		//It stores FLAGS
 typedef uint32_t			OS_DELAY_TYPE;		//It stores a number of TICKS.
 
 
-
 /* constants */
 #define OS_INFINITE					(~((int)0))
+#define BASE_LEVEL_ISR_NRO			(~((int)0))
 
 
 
@@ -86,7 +86,6 @@ typedef struct
     OS_PRIORITY_TYPE	def_priority;		    /* task priority (fixed) or default priority (dynamic) */
     tTCB_Dyn  *pDin;							/* pointer to the data representing the dynamic behavior of the task */
 } tTCB;
-
 
 
 #endif /* OS_DEFS_H_ */

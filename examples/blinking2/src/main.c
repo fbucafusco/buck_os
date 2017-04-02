@@ -10,20 +10,6 @@ typedef struct
 } tLedBlick;
 
 
-char Stages[100];
-uint16_t stage_counter =0 ;
-void AddStage( char a )
-{
-    Stages[stage_counter] = a;
-    stage_counter++;
-
-    if( stage_counter==100 )
-    {
-        stage_counter = 0;
-    }
-}
-
-
 /* ************************
  * PARAMETERS FOR EACH TASK
  * ************************ */
@@ -32,7 +18,7 @@ tLedBlick leds[] =
     [0] =
     {
         .led_number  = 3 ,
-        .delay = 300,
+        .delay = 500,
     },
 
     [1] =
@@ -68,24 +54,6 @@ OS_ADD_TASK( task2 )
 OS_ADD_TASK( task3 )
 DECLARE_OS_END()		/* FIN DE CONFIGURACION DE OS */
 
-
-
-
-/* sobrecargo la idle hook */
-void idle_hook( void*arg )
-{
-    int j;
-    while( 1 )
-    {
-        AddStage( 'I' );
-        Board_LED_Toggle( 1 );
-        for ( j=0 ; j< 0xFFFFFF ; j++ )
-        {
-        }
-    }
-}
-
-
 void generic_task_con_delay( void* arg )
 {
     tLedBlick * led_config = ( tLedBlick * ) arg;
@@ -95,7 +63,6 @@ void generic_task_con_delay( void* arg )
         Board_LED_Toggle( led_config->led_number );
         osDelay( led_config->delay );
         osSetEvent_T( 0x0001 , OS_TASK_REF( task3 ) );
-        AddStage( 'M' );
     }
 }
 
@@ -109,14 +76,9 @@ void task_wait( void* arg )
     while( 1 )
     {
         osWaitEvent( 0x0001 );
-
         Board_LED_Toggle( led_config->led_number );
-
-        a++;
-
         osDelay( led_config->delay );
         Board_LED_Toggle( led_config->led_number );
-        AddStage( 'S' );
     }
 }
 

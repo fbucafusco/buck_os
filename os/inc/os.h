@@ -59,5 +59,6 @@ void osTaskYield();
 void osTaskEnd();
 void osTaskStart( const tTCB *pTCB );
 void osDelay( OS_DELAY_TYPE delay_ms );	//TODO: rename as osTaskDelay
+tTCB *osTaskGetHandler();
 
 #endif /* OS_H */

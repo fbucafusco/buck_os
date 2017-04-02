@@ -4,6 +4,7 @@
  *  Created on: 16/3/2017
  *      Author: franco.bucafusco
  */
+
 #include "os_defs.h"
 #include "os_internal.h"
 
@@ -19,6 +20,7 @@ extern void _os_schedule();
 extern OS_PRIORITY_TYPE _os_pp_get_next_prio( OS_PRIORITY_TYPE curr_prio );
 extern void _os_pp_change_task_priority( tTCB *pTCB , OS_PRIORITY_TYPE newpriority );
 extern void _os_pp_restore_task_priority( tTCB *pTCB );
+
 
 /*
  * el mutex lo tiene que tomar y liberar la misma tarea.
@@ -67,6 +69,7 @@ void _os_mutex_block_if_taken( OS_MUTEX *pM )
     }
 }
 
+
 void _os_mutex_take( OS_MUTEX *pM )
 {
     pM->counter++;
@@ -80,6 +83,7 @@ void _os_mutex_take( OS_MUTEX *pM )
     /* call the scheduler */
     _os_schedule();
 }
+
 
 /*
  * Espera que se liberere el mutex. Cuando se libera, lo toma. Si ya estaba tomado, la tarea
@@ -107,7 +111,7 @@ void osMutexRelease( OS_MUTEX *pM )
             /* init the mutex pointer */
             ( ( tTCB * )pM->owner_task )->pDin->pWainingMut = NULL;
 
-            /* restores the original priority*/
+            /* restores the original priority */
             _os_pp_restore_task_priority( pM->owner_task );
 
             pM->owner_task = NULL;

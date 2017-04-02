@@ -59,8 +59,6 @@ void _os_task_block( tTCB *pTCB )
 
 
 
-
-
 void _os_tcb_init_stack( tTCB *pTcb )
 {
     uint32_t * stackframe_;
@@ -219,10 +217,17 @@ void osTaskYield()
 
     /*but the task in ready state */
     _os_task_change_state( OS_CURRENT_TASK_TCB_REF ,  osTskREADY );
+
     OS_ENABLE_ISR();
 
     /* call the scheduler */
     _os_schedule();
+}
+
+/* gets the handler for the running task */
+tTCB *osTaskGetHandler()
+{
+    return OS_CURRENT_TASK_TCB_REF;
 }
 
 /*

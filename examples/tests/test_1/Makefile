@@ -49,3 +49,5 @@ PROJECT_INC_FOLDERS := $(PROJECT)/inc      \
 # source files
 PROJECT_C_FILES := $(wildcard $(PROJECT)/src/*.c) $(wildcard $(PROJECT)/../../../os/src/*.c)
 PROJECT_ASM_FILES := $(wildcard $(PROJECT)/src/*.S) $(wildcard $(PROJECT)/../../../os/src/*.S)
+
+CFLAGS := -DOS_BUCK

@@ -12,6 +12,7 @@
 #include "os_config_internal.h"
 #include "os_tasks.h"
 #include "os_event.h"
+#include "os_isr.h"
 #include "board.h"
 
 #ifndef NULL
@@ -29,12 +30,9 @@
 #endif
 
 
-
-#define OS_PRI_COUNT 	5
+#define OS_PRI_COUNT 					5
 
 #define OS_IDLE_HOOK_PRIORITY 			0x55
-
-
 
 /* Schedule Policies */
 #define osSchPolicyROUND_ROBIN			0
@@ -83,7 +81,6 @@ typedef struct
 #define OS_NEXT_TASK_TCB_REF			Sched.next_task
 //#define OS_TASK_TCB_REF_INVALID
 #endif
-
 
 
 #define OS_IDLE_TASK_INDEX	TASK_COUNT

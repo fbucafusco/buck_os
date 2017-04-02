@@ -5,7 +5,6 @@
  *      Author: franco.bucafusco
  */
 
-
 /*
  * La mecanica de eventos será la siguiente:
  *
@@ -16,15 +15,13 @@
  *
  *
  * */
-
-
 #include "os_event.h"
 #include "os_internal.h"
 
 extern const tTCB 		*os_tcbs[];
 extern unsigned short 	TASK_COUNT;
 extern tSched 			Sched;
-extern tTCB *	os_sorted_Tcbs[];
+extern tTCB 			*os_sorted_Tcbs[];
 
 
 /* external os functions */
@@ -243,9 +240,9 @@ OS_EVENT_TYPE osWaitEvent( OS_EVENT_TYPE events )
 }
 
 /* It clears all events in the running task */
-void osClearEvents( void )
+void osClearEvents( OS_EVENT_TYPE events )
 {
     OS_DISABLE_ISR();
-    OS_CURRENT_TASK_TCB_REF->pDin->events_setted;
+    OS_CURRENT_TASK_TCB_REF->pDin->events_setted &= ~events;
     OS_ENABLE_ISR();
 }
